@@ -15,7 +15,19 @@ export function peyWebhookRoutes(app: FastifyInstance, store: AppointmentStore) 
   app.post("/webhooks/pey", async (req, reply) => {
     const rawBody = (req as RawBodyRequest).rawBody ?? "";
     const signature = req.headers["webhook-signature"] as string | undefined;
-    if (!verifyPeyWebhookSignature(signature, rawBody)) {
+    const webhookId = req.headers["webhook-id"] as string | undefined;
+    const webhookTimestamp = req.headers["webhook-timestamp"] as
+      | string
+      | undefined;
+    if (
+      !verifyPeyWebhookSignature(
+        signature,
+        rawBody,
+        undefined,
+        webhookId,
+        webhookTimestamp,
+      )
+    ) {
       app.log.warn("Webhook Pey con firma inválida o sin secreto configurado");
       return reply.status(401).send({ error: "Firma inválida" });
     }
