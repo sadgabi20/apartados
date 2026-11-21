@@ -1,7 +1,7 @@
 // POST /bookings — crea la cita en espera (hold 10 min).
 // GET /appointments/:id — consulta estado (la web lo usa para polling).
 import type { FastifyInstance } from "fastify";
-import { createAppointmentSchema } from "@citasegura/shared";
+import { createAppointmentSchema } from "@apartados/shared";
 import { createHold } from "../services/hold";
 import type { AppointmentStore } from "../store";
 

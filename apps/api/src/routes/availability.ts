@@ -3,7 +3,7 @@
 // ocupado según freeBusy. Sin Google conectado, devuelve todos los huecos
 // con google: "not-configured" (no se inventa disponibilidad).
 import type { FastifyInstance } from "fastify";
-import { getFreeBusy, overlaps } from "@citasegura/google-calendar";
+import { getFreeBusy, overlaps } from "@apartados/google-calendar";
 import type { AppointmentStore } from "../store";
 
 export function availabilityRoutes(app: FastifyInstance, store: AppointmentStore) {

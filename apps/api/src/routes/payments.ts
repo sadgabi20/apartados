@@ -4,8 +4,8 @@
 // sandbox). Si se pasa, el anticipo de la cita se actualiza a ese monto
 // para que el webhook lo pueda conciliar.
 import type { FastifyInstance } from "fastify";
-import { createPeyQr, extractQrPayload } from "@citasegura/pey";
-import { createChargeSchema } from "@citasegura/shared";
+import { createPeyQr, extractQrPayload } from "@apartados/pey";
+import { createChargeSchema } from "@apartados/shared";
 import type { AppointmentStore } from "../store";
 
 export function paymentRoutes(app: FastifyInstance, store: AppointmentStore) {

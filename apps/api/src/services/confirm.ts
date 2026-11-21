@@ -1,7 +1,7 @@
 // Webhook -> evento de Google a confirmado.
 // Idempotente: si la cita ya está confirmada (webhook duplicado), no se
 // vuelve a tocar Google ni se duplica nada; se devuelve la cita tal cual.
-import { confirmEvent } from "@citasegura/google-calendar";
+import { confirmEvent } from "@apartados/google-calendar";
 import type { AppointmentRecord, AppointmentStore } from "../store";
 import type { GoogleCtx } from "./hold";
 

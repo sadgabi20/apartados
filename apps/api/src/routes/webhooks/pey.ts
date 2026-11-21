@@ -4,8 +4,8 @@
 // La firma se verifica sobre el cuerpo CRUDO (req.rawBody): nunca sobre
 // el JSON re-serializado, o la firma no cuadra.
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { verifyPeyWebhookSignature } from "@citasegura/pey";
-import { peyWebhookSchema } from "@citasegura/shared";
+import { verifyPeyWebhookSignature } from "@apartados/pey";
+import { peyWebhookSchema } from "@apartados/shared";
 import { confirmAppointment } from "../../services/confirm";
 import type { AppointmentStore } from "../../store";
 

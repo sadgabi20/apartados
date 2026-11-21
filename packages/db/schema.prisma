@@ -1,4 +1,4 @@
-// CitaSegura — Prisma + Supabase/Postgres
+// Apartados — Prisma + Supabase/Postgres
 // Tablas clave según la estructura entregada el 21 nov 2026.
 // Appointment une todo: businessId, serviceId, startAt/endAt,
 // status hold | confirmed | released | cancelled, depositAmount,

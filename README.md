@@ -1,4 +1,6 @@
-# CitaSegura — monorepo (Bloque 3 del sábado implementado como borrador)
+# Apartados — monorepo (Bloque 3 del sábado implementado como borrador)
+
+Dominio: **apartados.app** — antes CitaSegura, renombrado el 21 nov 2026.
 
 Turborepo + pnpm + TypeScript. Estructura entregada en el chat el 21 nov 2026,
 ahora como archivos reales para no copiarla a mano.
@@ -15,8 +17,8 @@ copia `.env.example` a `.env` y completa tu API key.
 verifica el webhook y mueve el evento en Google de en espera a confirmada.
 
 ## Arranque sábado 21 nov — 2 horas
-Ver guía completa en `/home/hatch/workspace/citasegura-sabado-21.md`
-y plan completo en `/home/hatch/workspace/citasegura-plan.md`.
+Ver guía completa en `/home/hatch/workspace/apartados-sabado-21.md`
+y plan completo en `/home/hatch/workspace/apartados-plan.md`.
 
 1. **Pey (30 min):** https://portal.mipey.mx — API key, vincula cuenta,
    QR de prueba `POST https://api.pey.mx/codi/qr` con `amount: 0.01`,
@@ -30,8 +32,8 @@ y plan completo en `/home/hatch/workspace/citasegura-plan.md`.
    y `apps/api/src/routes/*`. Meta: reserva → QR $0.01 → pago →
    evento confirmado en Calendar; sin pago en 10 min, se libera solo.
    → Hecho como borrador el 21 nov (ver "Qué se implementó" abajo).
-   Para correrlo: `pnpm install && pnpm --filter @citasegura/api dev`
-   (puerto 3001) y `pnpm --filter @citasegura/web dev` (puerto 3000).
+   Para correrlo: `pnpm install && pnpm --filter @apartados/api dev`
+   (puerto 3001) y `pnpm --filter @apartados/web dev` (puerto 3000).
    La API usa un store en memoria con un negocio demo (`barberia-demo`,
    Corte + barba, $50); la tienda de producción es Prisma/Supabase.
 

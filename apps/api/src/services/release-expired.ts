@@ -4,7 +4,7 @@
 // devuelve el contexto de Google del negocio de cada cita (o null si el
 // negocio aún no conectó su calendario: entonces solo se libera en base
 // de datos y el evento en espera, si lo hay, se borra cuando se conecte).
-import { deleteEvent } from "@citasegura/google-calendar";
+import { deleteEvent } from "@apartados/google-calendar";
 import type { AppointmentStore } from "../store";
 import type { GoogleCtx } from "./hold";
 

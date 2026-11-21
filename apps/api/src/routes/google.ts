@@ -2,7 +2,7 @@
 // GET /google/auth?slug=barberia-demo -> redirige a Google.
 // GET /google/callback?code=...&state=<slug> -> guarda tokens y calendario.
 import type { FastifyInstance } from "fastify";
-import { buildGoogleAuthUrl, exchangeGoogleCode } from "@citasegura/google-calendar";
+import { buildGoogleAuthUrl, exchangeGoogleCode } from "@apartados/google-calendar";
 import type { AppointmentStore } from "../store";
 
 function oauthConfig() {
