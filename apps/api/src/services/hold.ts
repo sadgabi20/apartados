@@ -27,6 +27,9 @@ export async function createHold(input: {
 }): Promise<AppointmentRecord> {
   const start = new Date(input.startAt);
   const end = new Date(start.getTime() + input.durationMin * 60_000);
+  // Normalizar a ISO Z: la reserva puede llegar con -06:00 (de
+  // /availability) o con Z; se guarda siempre en el mismo formato.
+  const startAt = start.toISOString();
   const endAt = end.toISOString();
 
   let googleEventId: string | null = null;
@@ -34,17 +37,17 @@ export async function createHold(input: {
     const busy = await getFreeBusy(
       input.google.accessToken,
       input.google.calendarId,
-      input.startAt,
+      startAt,
       endAt,
     );
-    if (overlaps(busy, input.startAt, endAt)) {
+    if (overlaps(busy, startAt, endAt)) {
       throw new Error("SLOT_TAKEN");
     }
     googleEventId = await createHoldEvent(
       input.google.accessToken,
       input.google.calendarId,
       {
-        startAt: input.startAt,
+        startAt,
         endAt,
         serviceName: input.serviceName,
         customerName: input.customerName,
@@ -57,7 +60,7 @@ export async function createHold(input: {
   return input.store.createAppointment({
     businessId: input.businessId,
     serviceId: input.serviceId,
-    startAt: input.startAt,
+    startAt,
     endAt,
     status: "hold",
     depositAmount: input.depositAmount,

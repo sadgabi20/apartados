@@ -3,7 +3,9 @@ import { z } from "zod";
 export const createAppointmentSchema = z.object({
   businessId: z.string(),
   serviceId: z.string(),
-  startAt: z.string().datetime(),
+  // offset: true — /availability devuelve huecos con -06:00 y la web los
+  // manda tal cual; sin esto, .datetime() solo acepta Z y la reserva fallaba.
+  startAt: z.string().datetime({ offset: true }),
   customerName: z.string().min(1),
   customerPhone: z.string().min(1),
 });
