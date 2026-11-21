@@ -29,7 +29,18 @@ export function paymentRoutes(app: FastifyInstance, store: AppointmentStore) {
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
-    const qr = await createPeyQr(parsed.data);
+    let qr;
+    try {
+      qr = await createPeyQr(parsed.data);
+    } catch (err) {
+      // Falta de configuración o fallo de Pey: 503 con mensaje visible en la
+      // web, no un 500 genérico (la cita sigue en hold y se libera sola).
+      req.log.error(err);
+      const message = err instanceof Error ? err.message : "Error al generar el QR";
+      return reply.status(503).send({
+        error: `No se pudo generar el QR de pago: ${message}`,
+      });
+    }
     const updated = store.updateAppointment(appointment.id, {
       depositAmount: amount,
       peyQrId: typeof qr.codiQrId === "string" ? qr.codiQrId : null,
