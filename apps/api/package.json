@@ -1,0 +1,1 @@
+{"dependencies":{"@citasegura/google-calendar":"workspace:*","@citasegura/pey":"workspace:*","@citasegura/shared":"workspace:*","fastify":"^5.0.0"},"devDependencies":{"@types/node":"^22.0.0","tsx":"^4.0.0","typescript":"^5.5.0"},"name":"@citasegura/api","private":true,"scripts":{"build":"tsc","dev":"tsx watch src/index.ts"}}

@@ -1,0 +1,77 @@
+// CitaSegura — Prisma + Supabase/Postgres
+// Tablas clave según la estructura entregada el 21 nov 2026.
+// Appointment une todo: businessId, serviceId, startAt/endAt,
+// status hold | confirmed | released | cancelled, depositAmount,
+// googleEventId, peyQrId, transactionId, customerName/Phone.
+// numRef (referencia Pey) = id de la cita.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id        String        @id @default(cuid())
+  slug      String        @unique
+  name      String
+  services  Service[]
+  appointments Appointment[]
+  googleAccount GoogleAccount?
+  createdAt DateTime      @default(now())
+}
+
+model Service {
+  id             String        @id @default(cuid())
+  businessId     String
+  business       Business      @relation(fields: [businessId], references: [id])
+  name           String
+  durationMin    Int
+  depositAmount  Int           // MXN, p. ej. 50 para la demo
+  appointments   Appointment[]
+}
+
+model Appointment {
+  id             String   @id @default(cuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id])
+  serviceId      String
+  service        Service  @relation(fields: [serviceId], references: [id])
+  startAt        DateTime
+  endAt          DateTime
+  status         String   // hold | confirmed | released | cancelled
+  depositAmount  Int
+  googleEventId  String?
+  peyQrId        String?
+  transactionId  String?
+  customerName   String?
+  customerPhone  String?
+  payments       Payment[]
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime // startAt hold: createdAt + 10 min
+}
+
+model Payment {
+  id            String      @id @default(cuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  amount        Int
+  numRef        String      // = Appointment.id
+  transactionId String?
+  codiQrId      String?
+  status        String      // pending | paid
+  datePaid      DateTime?
+  createdAt     DateTime    @default(now())
+}
+
+model GoogleAccount {
+  id           String   @id @default(cuid())
+  businessId   String   @unique
+  business     Business @relation(fields: [businessId], references: [id])
+  calendarId   String
+  accessToken  String?
+  refreshToken String?
+  createdAt    DateTime @default(now())
+}

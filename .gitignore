@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# env / secrets - NUNCA subir
+.env
+.env.local
+.env.*.local
+
+# build
+dist/
+build/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# prisma
+*.db
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
