@@ -1,79 +1,45 @@
-# Apartados — monorepo (Bloque 3 del sábado implementado como borrador)
+# Apartados
 
-Dominio: **apartados.app** — antes CitaSegura, renombrado el 21 nov 2026.
+**El anticipo que confirma la cita.**
 
-Turborepo + pnpm + TypeScript. Estructura entregada en el chat el 21 nov 2026,
-ahora como archivos reales para no copiarla a mano.
+Apartados es para negocios de servicios —barberías, dentistas, talleres, estudios de uñas o tatuaje— que pierden dinero cuando un cliente reserva y no llega. Con Apartados, la cita solo queda confirmada cuando el cliente paga un anticipo con CoDi, sin comisión. Esa hora ya no se vende dos veces.
 
-**Estado (21 nov, mañana): el flujo principal está implementado como borrador,
-sin probar contra Pey ni Google reales.** Los clientes de Pey y Google Calendar,
-los servicios de hold/confirm/release y las rutas de la API están escritos;
-falta correrlos con las claves reales. No hay secretos aquí:
-copia `.env.example` a `.env` y completa tu API key.
+## Cómo funciona
 
-## Regla
-`apps/web` nunca toca Pey ni Google directo. Solo llama a `apps/api`.
-`apps/api` es la única que crea la cita en espera, genera el QR,
-verifica el webhook y mueve el evento en Google de en espera a confirmada.
+1. **El negocio conecta su Google Calendar.** No aprende otra agenda: su calendario ya es la agenda. Define sus servicios, duración y anticipo.
+2. **El cliente elige servicio y hora en un link.** Paga el anticipo con un QR de CoDi desde su app bancaria.
+3. **La cita queda bloqueada.** Al confirmarse el pago, la hora se aparta en Google Calendar. Si el cliente no paga en 10 minutos, la hora se libera sola y vuelve a estar disponible.
 
-## Arranque sábado 21 nov — 2 horas
-Ver guía completa en `/home/hatch/workspace/apartados-sabado-21.md`
-y plan completo en `/home/hatch/workspace/apartados-plan.md`.
+## Demo
 
-1. **Pey (30 min):** https://portal.mipey.mx — API key, vincula cuenta,
-   QR de prueba `POST https://api.pey.mx/codi/qr` con `amount: 0.01`,
-   `expiration: 600`, `numRef: "prueba-001"`. Pey no tiene sandbox:
-   pruebas en producción con montos pequeños.
-2. **Google Calendar (30 min):** Google Cloud, activa Calendar API,
-   ámbitos `calendar.freebusy` + `calendar.events.owned`.
-   Conecta un calendario de prueba.
-3. **Repo (60 min):** `pnpm install`, luego implementa
-   `packages/pey/src/client.ts`, `packages/google-calendar/src/*`
-   y `apps/api/src/routes/*`. Meta: reserva → QR $0.01 → pago →
-   evento confirmado en Calendar; sin pago en 10 min, se libera solo.
-   → Hecho como borrador el 21 nov (ver "Qué se implementó" abajo).
-   Para correrlo: `pnpm install && pnpm --filter @apartados/api dev`
-   (puerto 3001) y `pnpm --filter @apartados/web dev` (puerto 3000).
-   La API usa un store en memoria con un negocio demo (`barberia-demo`,
-   Corte + barba, $50); la tienda de producción es Prisma/Supabase.
+Reserva demo en `/b/barberia-demo`: corte + barba, 60 minutos, anticipo de $50 MXN.
 
-## Qué se implementó (borrador, 21 nov)
-- `packages/pey`: `createPeyQr` (POST /codi/qr, 201) y verificación de
-  firma del webhook (HMAC-SHA256 v1, falla cerrada).
-- `packages/google-calendar`: OAuth (URL + intercambio de código),
-  `freeBusy` (falla cerrada si hay errores), `events.insert` (hold),
-  `events.patch` (confirmado) y `events.delete` (liberar).
-- `apps/api`: `GET /availability`, `POST /bookings`, `POST /payments`,
-  `POST /webhooks/pey` (cuerpo crudo para la firma), `GET /google/auth`
-  y `/google/callback`, `POST /release-expired` + intervalo cada minuto.
-- `apps/web`: página de reserva `/b/[slug]` (elige hora → QR → polling
-  del estado) y landing mínima.
+## Para correrlo en local
 
-## ⚠️ Sin verificar antes de la demo
-- **Firma del webhook de Pey:** docs.pey.mx (21 nov) solo muestra la
-  cabecera `webhook-signature: v1,…`, sin algoritmo ni material firmado.
-  El código prueba HMAC-SHA256 sobre el cuerpo crudo (y `t.cuerpo` si
-  trae `t=`). Confírmalo con el primer webhook real o en el portal;
-  si falla, el pago no se confirma.
-- **Respuesta del QR de Pey:** los docs no muestran sus campos. La web
-  muestra `qr` / `qrText` / `image` / `url` si vienen, o el JSON entero.
-- **Google:** falta conectar un calendario real (OAuth) y refrescar el
-  token cuando expire; el store en memoria se pierde al reiniciar la API
-  (cámbialo por Prisma antes de la demo con un negocio real).
+```bash
+pnpm install
+cp .env.example .env
+pnpm dev
+```
 
-## Decisión por defecto
-Nicho: **barbería**. Anticipo demo: **$50 MXN**.
-Cámbiala con una palabra — el flujo no cambia para dentista, taller,
-uñas o tatuaje.
+- Web: http://localhost:3000
+- API: http://localhost:3001
 
-## Alineación pitch ↔ demo
-El pitch de 3 minutos decía $100 en la demo. Si confirmas $50,
-cambia esa línea por:
-> "elijo corte y barba, elijo las 11, y pago 50 pesos de anticipo."
+Completa en `.env` tu API key de Pey y las credenciales de Google Cloud para conectar un calendario real.
 
-La prueba técnica se hace con $0.01 MXN; $50 es solo el monto que se enseña.
+## Estructura
 
-## Fechas
-Hackatón México 2026: 14 nov–12 dic 2026. Entrega: 12 dic.
-Ganadores: 14 dic.
-Ojo: viernes 27 nov tienes "Pagar NU TDC" todo el día — deja ese día ligero.
+Monorepo con Turborepo + pnpm + TypeScript:
+
+- `apps/web` — Next.js: reserva pública, panel del negocio y alta.
+- `apps/api` — Node + Fastify: disponibilidad, reservas, pagos y webhooks.
+- `packages/pey` — Cliente de Pey / CoDi.
+- `packages/google-calendar` — Cliente de Google Calendar.
+- `packages/db` — Prisma + Postgres.
+- `packages/shared`, `packages/ui`, `packages/config` — Tipos, componentes y configuración compartida.
+
+La web nunca habla directo con Pey ni con Google: solo llama a la API, que es la única que crea la cita, genera el QR y confirma el pago.
+
+## Hackatón México 2026
+
+Apartados participa en Hackatón México 2026, con integración de Pey / CoDi. Dominio: apartados.app
