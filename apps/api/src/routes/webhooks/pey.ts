@@ -39,7 +39,7 @@ export function peyWebhookRoutes(app: FastifyInstance, store: AppointmentStore) 
     if (event.type !== "codi.qr.payment_received") {
       return { ok: true, ignored: event.type };
     }
-    const appointment = store.getAppointment(event.numRef);
+    const appointment = store.getAppointmentByNumRef(event.numRef);
     if (!appointment) return reply.status(404).send({ error: "Cita no encontrada" });
     if (event.amount !== appointment.depositAmount) {
       app.log.warn(

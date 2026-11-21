@@ -1,7 +1,7 @@
 // Apartar hueco 10 min, liberar si no paga.
 // Al elegir hueco: re-consultar freeBusy, crear evento en espera en
 // Google + registrar la cita en hold. El cobro Pey se crea aparte
-// (routes/payments.ts) con numRef = cita-id.
+// (routes/payments.ts) con numRef = cita-numRef (7 dígitos).
 // Si Google aún no está conectado (google = null), la cita se aparta
 // solo en base de datos y googleEventId queda null: así el sábado puede
 // avanzar el flujo de Pey aunque el OAuth de Google se atore.

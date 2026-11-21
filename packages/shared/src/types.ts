@@ -8,7 +8,7 @@ export interface Appointment {
   endAt: string;
   status: AppointmentStatus;
   depositAmount: number;
-  numRef: string; // = id de la cita, referencia Pey
+  numRef: string; // Referencia numérica Pey (7 dígitos), distinta del id UUID
   googleEventId?: string | null;
   peyQrId?: string | null;
   transactionId?: string | null;

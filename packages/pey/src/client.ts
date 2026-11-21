@@ -8,7 +8,7 @@ export interface CreatePeyQrInput {
   amount: number;
   concept: string;
   expiration: 600;
-  numRef: string; // = Appointment.id
+  numRef: string; // = Appointment.numRef (numérico, máx. 7 dígitos)
 }
 
 export type PeyQrResponse = Record<string, unknown> & {

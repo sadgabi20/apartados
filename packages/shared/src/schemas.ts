@@ -14,7 +14,7 @@ export const createChargeSchema = z.object({
   amount: z.number().positive(),
   concept: z.string(),
   expiration: z.literal(600),
-  numRef: z.string(), // = Appointment.id
+  numRef: z.string(), // = Appointment.numRef (numérico, máx. 7 dígitos)
 });
 
 export const peyWebhookSchema = z.object({

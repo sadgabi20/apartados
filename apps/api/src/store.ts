@@ -30,6 +30,9 @@ export interface AppointmentRecord {
   endAt: string;
   status: AppointmentStatus;
   depositAmount: number;
+  // Referencia numérica para Pey: hasta 7 dígitos, única por cita.
+  // Pey rechaza el UUID (400 "Numeric reference must be up to 7 digits").
+  numRef: string;
   googleEventId: string | null;
   peyQrId: string | null;
   transactionId: string | null;
@@ -45,8 +48,9 @@ export interface AppointmentStore {
   saveBusiness(b: BusinessRecord): void;
   getService(id: string): ServiceRecord | undefined;
   listServices(businessId: string): ServiceRecord[];
-  createAppointment(a: Omit<AppointmentRecord, "id" | "createdAt"> & { id?: string }): AppointmentRecord;
+  createAppointment(a: Omit<AppointmentRecord, "id" | "createdAt" | "numRef"> & { id?: string; numRef?: string }): AppointmentRecord;
   getAppointment(id: string): AppointmentRecord | undefined;
+  getAppointmentByNumRef(numRef: string): AppointmentRecord | undefined;
   updateAppointment(id: string, patch: Partial<AppointmentRecord>): AppointmentRecord | undefined;
   listExpiredHolds(now: Date): AppointmentRecord[];
 }
@@ -55,6 +59,8 @@ export function createMemoryStore(): AppointmentStore {
   const businesses = new Map<string, BusinessRecord>();
   const services = new Map<string, ServiceRecord>();
   const appointments = new Map<string, AppointmentRecord>();
+  // Pey exige numRef numérico de hasta 7 dígitos: secuencial por cita.
+  let nextNumRef = 1000000;
 
   // Negocio demo por defecto: barbería, anticipo $50 (decisión por defecto
   // del sábado 21 nov; se cambia con una palabra).
@@ -90,12 +96,15 @@ export function createMemoryStore(): AppointmentStore {
       const rec: AppointmentRecord = {
         ...a,
         id: a.id ?? crypto.randomUUID(),
+        numRef: a.numRef ?? String(++nextNumRef),
         createdAt: new Date().toISOString(),
       };
       appointments.set(rec.id, rec);
       return rec;
     },
     getAppointment: (id) => appointments.get(id),
+    getAppointmentByNumRef: (numRef) =>
+      [...appointments.values()].find((a) => a.numRef === numRef),
     updateAppointment: (id, patch) => {
       const rec = appointments.get(id);
       if (!rec) return undefined;

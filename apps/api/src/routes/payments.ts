@@ -1,5 +1,5 @@
 // POST /payments — genera el QR Pey del anticipo.
-// numRef = Appointment.id: es lo que une pago y hueco.
+// numRef = Appointment.numRef (7 dígitos): es lo que une pago y hueco.
 // amount opcional: para la prueba técnica con $0.01 MXN (Pey no tiene
 // sandbox). Si se pasa, el anticipo de la cita se actualiza a ese monto
 // para que el webhook lo pueda conciliar.
@@ -24,7 +24,7 @@ export function paymentRoutes(app: FastifyInstance, store: AppointmentStore) {
       amount,
       concept: `Anticipo cita ${appointment.startAt}`,
       expiration: 600,
-      numRef: appointment.id,
+      numRef: appointment.numRef,
     });
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
