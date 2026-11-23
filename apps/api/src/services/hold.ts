@@ -1,4 +1,6 @@
-// Apartar hueco 10 min, liberar si no paga.
+// Apartar hueco y liberar si no paga. holdMinutes: 10 por defecto
+// (autoservicio) o 60 cuando la cita la crea el negocio (flujo manual
+// por WhatsApp: el cliente no está delante en ese momento).
 // Al elegir hueco: re-consultar freeBusy, crear evento en espera en
 // Google + registrar la cita en hold. El cobro Pey se crea aparte
 // (routes/payments.ts) con numRef = cita-numRef (7 dígitos).
@@ -24,6 +26,7 @@ export async function createHold(input: {
   startAt: string; // ISO
   customerName: string;
   customerPhone: string;
+  holdMinutes?: number;
 }): Promise<AppointmentRecord> {
   const start = new Date(input.startAt);
   const end = new Date(start.getTime() + input.durationMin * 60_000);
@@ -56,7 +59,9 @@ export async function createHold(input: {
     );
   }
 
-  const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+  const expiresAt = new Date(
+    Date.now() + (input.holdMinutes ?? 10) * 60_000,
+  ).toISOString();
   return input.store.createAppointment({
     businessId: input.businessId,
     serviceId: input.serviceId,

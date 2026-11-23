@@ -5,10 +5,13 @@
 // los servicios solo usan esta interfaz.
 export type AppointmentStatus = "hold" | "confirmed" | "released" | "cancelled";
 
+export type AgendaVisibility = "public" | "private";
+
 export interface BusinessRecord {
   id: string;
   slug: string;
   name: string;
+  agendaVisibility: AgendaVisibility;
   calendarId: string | null;
   googleAccessToken: string | null;
   googleRefreshToken: string | null;
@@ -68,6 +71,7 @@ export function createMemoryStore(): AppointmentStore {
     id: "biz-barberia-demo",
     slug: "barberia-demo",
     name: "Barbería Demo",
+    agendaVisibility: "public",
     calendarId: process.env.GOOGLE_TEST_CALENDAR_ID ?? null,
     googleAccessToken: process.env.GOOGLE_TEST_ACCESS_TOKEN ?? null,
     googleRefreshToken: null,

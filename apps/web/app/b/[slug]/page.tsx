@@ -1,8 +1,10 @@
 // Página pública de reserva: servicio -> hora -> pago.
 // La web NUNCA toca Pey ni Google directo: solo llama a apps/api.
-// Nota: la forma exacta de la respuesta del QR de Pey no está documentada
-// en docs.pey.mx; la página muestra el campo que traiga (qr / qrText /
-// image / url) y, si no hay ninguno, el JSON completo.
+// Si la agenda es privada, no muestra disponibilidad ni formulario:
+// solo el negocio puede apartar huecos (desde /negocio/[slug]) y mandar
+// el link de confirmación. Nota: la forma exacta de la respuesta del QR
+// de Pey no está documentada en docs.pey.mx; la página muestra el campo
+// que traiga (qr / qrText / image / url) y, si no hay ninguno, el JSON.
 "use client";
 
 import { useEffect, useState } from "react";
@@ -15,6 +17,12 @@ interface Service {
   name: string;
   durationMin: number;
   depositAmount: number;
+}
+interface Business {
+  id: string;
+  slug: string;
+  name: string;
+  agendaVisibility: "public" | "private";
 }
 interface Appointment {
   id: string;
@@ -29,6 +37,7 @@ export default function BookingPage() {
   const slug = params.slug as string;
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
+  const [business, setBusiness] = useState<Business | null>(null);
   const [service, setService] = useState<Service | null>(null);
   const [slots, setSlots] = useState<string[]>([]);
   const [google, setGoogle] = useState("");
@@ -40,6 +49,17 @@ export default function BookingPage() {
   const [status, setStatus] = useState("");
 
   useEffect(() => {
+    fetch(`${API}/businesses/${slug}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.business) setBusiness(d.business);
+        if (d.error) setError(d.error);
+      })
+      .catch(() => setError("No se pudo contactar a la API (¿corre en :3001?)"));
+  }, [slug]);
+
+  useEffect(() => {
+    if (!business || business.agendaVisibility === "private") return;
     fetch(`${API}/availability?slug=${slug}&date=${date}`)
       .then((r) => r.json())
       .then((d) => {
@@ -49,7 +69,7 @@ export default function BookingPage() {
         if (d.error) setError(d.error);
       })
       .catch(() => setError("No se pudo contactar a la API (¿corre en :3001?)"));
-  }, [date, slug]);
+  }, [date, slug, business]);
 
   useEffect(() => {
     if (!appointment || appointment.status !== "hold") return;
@@ -70,7 +90,7 @@ export default function BookingPage() {
 
   async function reserve(startAt: string, testAmount?: number) {
     setError("");
-    if (!service || !name || !phone) {
+    if (!business || !service || !name || !phone) {
       setError("Escribe tu nombre y teléfono antes de elegir hora.");
       return;
     }
@@ -78,11 +98,12 @@ export default function BookingPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        businessId: "biz-barberia-demo",
+        businessId: business.id,
         serviceId: service.id,
         startAt,
         customerName: name,
         customerPhone: phone,
+        source: "customer",
       }),
     });
     const bData = await bRes.json();
@@ -106,6 +127,18 @@ export default function BookingPage() {
     setAppointment(pData.appointment);
     setStatus("hold");
     setQrPayload(pData.qrPayload ?? JSON.stringify(pData.qr));
+  }
+
+  if (business?.agendaVisibility === "private") {
+    return (
+      <main>
+        <h1>Reserva — {business.name}</h1>
+        <p>
+          Esta agenda es privada. Para apartar tu cita, contacta directamente al
+          negocio por WhatsApp o teléfono y te mandarán tu link de confirmación y pago.
+        </p>
+      </main>
+    );
   }
 
   return (

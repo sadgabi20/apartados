@@ -28,4 +28,5 @@ export interface Business {
   id: string;
   slug: string;
   name: string;
+  agendaVisibility?: "public" | "private";
 }

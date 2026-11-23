@@ -1,5 +1,12 @@
-// POST /bookings — crea la cita en espera (hold 10 min).
-// GET /appointments/:id — consulta estado (la web lo usa para polling).
+// POST /bookings — crea la cita en espera (hold).
+// source=customer: autoservicio, hold 10 min. source=business: flujo
+// manual por WhatsApp (el negocio pone los datos del cliente), hold 60
+// min. En agenda privada solo el negocio puede crear citas (403 si no).
+// El QR NO se genera aquí: se genera bajo demanda en POST /payments
+// cuando el cliente abre /confirmar/[id] y toca pagar, para que los
+// 600 s de expiración del QR de Pey no se gasten en WhatsApp.
+// GET /appointments/:id — consulta estado (la web lo usa para polling);
+// devuelve también negocio y servicio para la página de confirmación.
 import type { FastifyInstance } from "fastify";
 import { createAppointmentSchema } from "@apartados/shared";
 import { createHold } from "../services/hold";
@@ -11,11 +18,18 @@ export function bookingRoutes(app: FastifyInstance, store: AppointmentStore) {
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
-    const { businessId, serviceId, startAt, customerName, customerPhone } = parsed.data;
+    const { businessId, serviceId, startAt, customerName, customerPhone, source } =
+      parsed.data;
     const business = store.getBusiness(businessId);
     const service = store.getService(serviceId);
     if (!business || !service) {
       return reply.status(404).send({ error: "Negocio o servicio no encontrado" });
+    }
+    if (business.agendaVisibility === "private" && source !== "business") {
+      return reply.status(403).send({
+        error: "Agenda privada: solo el negocio puede apartar citas",
+        visibility: "private",
+      });
     }
     const google =
       business.googleAccessToken && business.calendarId
@@ -33,6 +47,7 @@ export function bookingRoutes(app: FastifyInstance, store: AppointmentStore) {
         startAt,
         customerName,
         customerPhone,
+        holdMinutes: source === "business" ? 60 : 10,
       });
       return reply.status(201).send({ appointment });
     } catch (err) {
@@ -46,6 +61,26 @@ export function bookingRoutes(app: FastifyInstance, store: AppointmentStore) {
   app.get("/appointments/:id", async (req, reply) => {
     const appointment = store.getAppointment((req.params as { id: string }).id);
     if (!appointment) return reply.status(404).send({ error: "Cita no encontrada" });
-    return { appointment };
+    const business = store.getBusiness(appointment.businessId);
+    const service = store.getService(appointment.serviceId);
+    return {
+      appointment,
+      business: business
+        ? {
+            id: business.id,
+            slug: business.slug,
+            name: business.name,
+            agendaVisibility: business.agendaVisibility,
+          }
+        : null,
+      service: service
+        ? {
+            id: service.id,
+            name: service.name,
+            durationMin: service.durationMin,
+            depositAmount: service.depositAmount,
+          }
+        : null,
+    };
   });
 }
