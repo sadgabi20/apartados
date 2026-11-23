@@ -7,6 +7,7 @@ import cors from "@fastify/cors";
 import { createMemoryStore } from "./store";
 import { availabilityRoutes } from "./routes/availability";
 import { bookingRoutes } from "./routes/bookings";
+import { businessRoutes } from "./routes/businesses";
 import { paymentRoutes } from "./routes/payments";
 import { peyWebhookRoutes } from "./routes/webhooks/pey";
 import { googleRoutes } from "./routes/google";
@@ -46,6 +47,7 @@ async function main() {
   app.get("/health", async () => ({ ok: true }));
   availabilityRoutes(app, store);
   bookingRoutes(app, store);
+  businessRoutes(app, store);
   paymentRoutes(app, store);
   peyWebhookRoutes(app, store);
   googleRoutes(app, store);

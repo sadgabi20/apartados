@@ -18,6 +18,9 @@ model Business {
   id        String        @id @default(cuid())
   slug      String        @unique
   name      String
+  // Agenda pública (autoservicio en /b/[slug]) o privada (solo el
+  // negocio aparta huecos y manda el link de confirmación/pago).
+  agendaVisibility String @default("public")
   services  Service[]
   appointments Appointment[]
   googleAccount GoogleAccount?
@@ -52,7 +55,7 @@ model Appointment {
   customerPhone  String?
   payments       Payment[]
   createdAt      DateTime @default(now())
-  expiresAt      DateTime // startAt hold: createdAt + 10 min
+  expiresAt      DateTime // fin del hold: createdAt + 10 min (cliente) o 60 min (negocio)
 }
 
 model Payment {

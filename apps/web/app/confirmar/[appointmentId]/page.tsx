@@ -1,0 +1,163 @@
+// Página de confirmación para el cliente (flujo manual por WhatsApp).
+// El cliente no llena formularios: solo ve el resumen y paga.
+// La web NUNCA toca Pey ni Google directo: solo llama a apps/api.
+// El QR se genera bajo demanda al tocar "Confirmar y pagar" (el QR de
+// Pey expira en 600 s, así no se gasta mientras el link está en WhatsApp).
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+interface Appointment {
+  id: string;
+  status: string;
+  startAt: string;
+  depositAmount: number;
+  expiresAt: string;
+  customerName: string;
+  customerPhone: string;
+}
+interface Business {
+  name: string;
+  slug: string;
+}
+interface Service {
+  name: string;
+  durationMin: number;
+  depositAmount: number;
+}
+
+export default function ConfirmPage() {
+  const params = useParams();
+  const appointmentId = params.appointmentId as string;
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [business, setBusiness] = useState<Business | null>(null);
+  const [service, setService] = useState<Service | null>(null);
+  const [qrPayload, setQrPayload] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await fetch(`${API}/appointments/${appointmentId}`);
+    const data = await res.json();
+    if (!res.ok) {
+      setNotFound(true);
+      setError(data.error ?? "Cita no encontrada");
+      return;
+    }
+    setAppointment(data.appointment);
+    setBusiness(data.business ?? null);
+    setService(data.service ?? null);
+  }, [appointmentId]);
+
+  useEffect(() => {
+    load().catch(() => setError("No se pudo contactar a la API (¿corre en :3001?)"));
+  }, [load]);
+
+  useEffect(() => {
+    if (!appointment || appointment.status !== "hold") return;
+    const t = setInterval(() => {
+      fetch(`${API}/appointments/${appointment.id}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.appointment?.status !== "hold") {
+            setAppointment(d.appointment);
+            clearInterval(t);
+          }
+        })
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(t);
+  }, [appointment]);
+
+  async function pay() {
+    if (!appointment) return;
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentId: appointment.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "No se pudo generar el QR.");
+        return;
+      }
+      setAppointment(data.appointment);
+      setQrPayload(data.qrPayload ?? JSON.stringify(data.qr));
+    } catch {
+      setError("No se pudo contactar a la API (¿corre en :3001?)");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (notFound) {
+    return (
+      <main>
+        <h1>Link no válido</h1>
+        <p>Esta cita no existe. Pídele otro link al negocio.</p>
+        {error && <p style={{ color: "red" }}>{error}</p>}
+      </main>
+    );
+  }
+  if (!appointment) return <main><p>Cargando tu cita…</p></main>;
+
+  const expired =
+    appointment.status === "released" ||
+    (appointment.status === "hold" && new Date(appointment.expiresAt) <= new Date());
+
+  return (
+    <main>
+      <h1>{business?.name ?? "Tu cita"}</h1>
+      {appointment.status === "confirmed" ? (
+        <>
+          <h2>✅ Cita confirmada</h2>
+          <p>¡Listo! Tu cita está confirmada. Nos vemos ahí.</p>
+        </>
+      ) : expired ? (
+        <>
+          <h2>Este link expiró</h2>
+          <p>El tiempo para confirmar y pagar se acabó y la hora se liberó. Pídele otro link al negocio.</p>
+        </>
+      ) : (
+        <>
+          <h2>Confirma tu cita</h2>
+          <p>
+            Hola {appointment.customerName}, tienes apartada esta cita:
+          </p>
+        </>
+      )}
+      <p>
+        {service?.name ?? "Servicio"} · {service?.durationMin ?? ""} min
+        <br />
+        {appointment.startAt}
+        <br />
+        Anticipo: ${appointment.depositAmount} MXN
+      </p>
+      {appointment.status === "hold" && !expired && !qrPayload && (
+        <button onClick={pay} disabled={loading}>
+          {loading ? "Generando QR…" : "Confirmar y pagar"}
+        </button>
+      )}
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      {appointment.status === "hold" && !expired && qrPayload && (
+        <section>
+          <h2>Paga tu anticipo</h2>
+          {qrPayload.startsWith("http") || qrPayload.startsWith("data:image") ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={qrPayload} alt="QR CoDi para pagar el anticipo" width={240} />
+          ) : (
+            <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{qrPayload}</pre>
+          )}
+          <p>Escanea el QR con tu app bancaria (CoDi). Tienes 10 minutos para pagar este QR.</p>
+        </section>
+      )}
+    </main>
+  );
+}

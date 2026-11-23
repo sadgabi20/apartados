@@ -8,6 +8,13 @@ export const createAppointmentSchema = z.object({
   startAt: z.string().datetime({ offset: true }),
   customerName: z.string().min(1),
   customerPhone: z.string().min(1),
+  // Quién crea la cita: el cliente (autoservicio, hold 10 min) o el
+  // negocio (flujo manual por WhatsApp, hold 60 min).
+  source: z.enum(["customer", "business"]).optional().default("customer"),
+});
+
+export const updateBusinessSchema = z.object({
+  agendaVisibility: z.enum(["public", "private"]),
 });
 
 export const createChargeSchema = z.object({
