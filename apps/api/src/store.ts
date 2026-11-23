@@ -12,9 +12,35 @@ export interface BusinessRecord {
   slug: string;
   name: string;
   agendaVisibility: AgendaVisibility;
+  // Dueño del negocio (googleSub de User). null = sin dueño (seed
+  // barberia-demo hasta la Fase 3): nadie puede administrarlo.
+  ownerId: string | null;
   calendarId: string | null;
   googleAccessToken: string | null;
   googleRefreshToken: string | null;
+}
+
+// Auth Fase 1 — espejo de los modelos User/Session de Prisma.
+// La sesión guarda solo el SHA-256 del token; el token en claro solo
+// existe en la cookie httpOnly del navegador.
+export interface UserRecord {
+  id: string;
+  googleSub: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SessionRecord {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  lastUsedAt: string;
+  userAgent: string | null;
+  createdAt: string;
 }
 
 export interface ServiceRecord {
@@ -49,6 +75,7 @@ export interface AppointmentStore {
   getBusinessBySlug(slug: string): BusinessRecord | undefined;
   getBusiness(id: string): BusinessRecord | undefined;
   saveBusiness(b: BusinessRecord): void;
+  listBusinessesByOwner(ownerId: string): BusinessRecord[];
   getService(id: string): ServiceRecord | undefined;
   listServices(businessId: string): ServiceRecord[];
   createAppointment(a: Omit<AppointmentRecord, "id" | "createdAt" | "numRef"> & { id?: string; numRef?: string }): AppointmentRecord;
@@ -56,22 +83,34 @@ export interface AppointmentStore {
   getAppointmentByNumRef(numRef: string): AppointmentRecord | undefined;
   updateAppointment(id: string, patch: Partial<AppointmentRecord>): AppointmentRecord | undefined;
   listExpiredHolds(now: Date): AppointmentRecord[];
+  // Auth Fase 1: upsert por googleSub (la identidad es el sub, no el email).
+  upsertUserByGoogleSub(u: Omit<UserRecord, "id" | "createdAt" | "updatedAt">): UserRecord;
+  getUserById(id: string): UserRecord | undefined;
+  createSession(s: Omit<SessionRecord, "id" | "createdAt">): SessionRecord;
+  getSessionByTokenHash(tokenHash: string): SessionRecord | undefined;
+  updateSession(id: string, patch: Partial<SessionRecord>): SessionRecord | undefined;
+  deleteSession(id: string): void;
+  deleteSessionsByUserId(userId: string): void;
 }
 
 export function createMemoryStore(): AppointmentStore {
   const businesses = new Map<string, BusinessRecord>();
   const services = new Map<string, ServiceRecord>();
   const appointments = new Map<string, AppointmentRecord>();
+  const users = new Map<string, UserRecord>();
+  const sessions = new Map<string, SessionRecord>();
   // Pey exige numRef numérico de hasta 7 dígitos: secuencial por cita.
   let nextNumRef = 1000000;
 
   // Negocio demo por defecto: barbería, anticipo $50 (decisión por defecto
-  // del sábado 21 nov; se cambia con una palabra).
+  // del sábado 21 nov; se cambia con una palabra). Sin dueño hasta la
+  // Fase 3 (ownerId null): sus endpoints protegidos dan 403 para todos.
   const business: BusinessRecord = {
     id: "biz-barberia-demo",
     slug: "barberia-demo",
     name: "Barbería Demo",
     agendaVisibility: "public",
+    ownerId: null,
     calendarId: process.env.GOOGLE_TEST_CALENDAR_ID ?? null,
     googleAccessToken: process.env.GOOGLE_TEST_ACCESS_TOKEN ?? null,
     googleRefreshToken: null,
@@ -92,6 +131,45 @@ export function createMemoryStore(): AppointmentStore {
     getBusiness: (id) => businesses.get(id),
     saveBusiness: (b) => {
       businesses.set(b.id, b);
+    },
+    listBusinessesByOwner: (ownerId) =>
+      [...businesses.values()].filter((b) => b.ownerId === ownerId),
+    upsertUserByGoogleSub: (u) => {
+      const now = new Date().toISOString();
+      const existing = [...users.values()].find((x) => x.googleSub === u.googleSub);
+      if (existing) {
+        // El email puede cambiar en Google; el sub no. Se actualiza el
+        // perfil, nunca se crea un segundo usuario.
+        const next = { ...existing, email: u.email, name: u.name, avatarUrl: u.avatarUrl, updatedAt: now };
+        users.set(next.id, next);
+        return next;
+      }
+      const rec: UserRecord = { ...u, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
+      users.set(rec.id, rec);
+      return rec;
+    },
+    getUserById: (id) => users.get(id),
+    createSession: (s) => {
+      const rec: SessionRecord = { ...s, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+      sessions.set(rec.id, rec);
+      return rec;
+    },
+    getSessionByTokenHash: (tokenHash) =>
+      [...sessions.values()].find((s) => s.tokenHash === tokenHash),
+    updateSession: (id, patch) => {
+      const rec = sessions.get(id);
+      if (!rec) return undefined;
+      const next = { ...rec, ...patch };
+      sessions.set(id, next);
+      return next;
+    },
+    deleteSession: (id) => {
+      sessions.delete(id);
+    },
+    deleteSessionsByUserId: (userId) => {
+      for (const s of [...sessions.values()]) {
+        if (s.userId === userId) sessions.delete(s.id);
+      }
     },
     getService: (id) => services.get(id),
     listServices: (businessId) =>
