@@ -1,0 +1,30 @@
+# Apartados API en Render (plan gratis).
+# Blueprint: en el dashboard de Render, New > Blueprint, conecta el repo
+# sadgabi20/apartados y Render crea el servicio con estos ajustes.
+# Guía paso a paso: docs/deploy-render.md
+# Los secretos (sync: false) los pide Render en el dashboard, nunca van
+# en este archivo ni en el repo.
+services:
+  - type: web
+    name: apartados-api
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: pnpm --filter @apartados/api start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGINS
+        value: https://apartados-one.vercel.app
+      - key: PEY_API_KEY
+        sync: false
+      - key: PEY_WEBHOOK_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
