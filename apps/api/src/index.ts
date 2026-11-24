@@ -69,8 +69,11 @@ async function main() {
     );
   }, 60_000).unref();
 
-  const port = Number(process.env.API_PORT ?? 3001);
-  await app.listen({ port });
+  // Puerto y host para producción (Render): Render inyecta PORT y exige
+  // escuchar en 0.0.0.0; si no, el servicio nunca recibe tráfico y Render
+  // lo marca como fallido. En local sigue valiendo API_PORT (default 3001).
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
+  await app.listen({ port, host: "0.0.0.0" });
 }
 
 main().catch((err) => {
