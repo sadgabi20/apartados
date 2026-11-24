@@ -49,11 +49,12 @@ model Business {
   // Agenda pública (autoservicio en /b/[slug]) o privada (solo el
   // negocio aparta huecos y manda el link de confirmación/pago).
   agendaVisibility String @default("public")
-  // Dueño del negocio (1 dueño → N negocios). Nullable solo durante la
-  // migración: barberia-demo queda sin dueño hasta la Fase 3, y sus
-  // endpoints protegidos dan 403 para todo el mundo hasta entonces.
-  ownerId          String?
-  owner            User?   @relation(fields: [ownerId], references: [id])
+  // Dueño del negocio (1 dueño → N negocios). Requerido desde la Fase 3:
+  // barberia-demo ya tiene dueño real (aaxelaltamirano@gmail.com, por
+  // googleSub) y ningún negocio puede existir sin dueño. La migración
+  // 20261124133600_business_owner_required lo vuelve NOT NULL.
+  ownerId          String
+  owner            User    @relation(fields: [ownerId], references: [id])
   services  Service[]
   appointments Appointment[]
   googleAccount GoogleAccount?

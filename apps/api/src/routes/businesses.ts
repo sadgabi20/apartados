@@ -6,8 +6,8 @@
 // silencioso (decisión de Axel §10).
 // PATCH /businesses/:slug { agendaVisibility: "public" | "private" } —
 // cambia pública/privada. Protegido (Fase 1): solo el dueño del negocio.
-// barberia-demo no tiene dueño hasta la Fase 3, así que su PATCH da 403
-// para todo el mundo hasta entonces.
+// barberia-demo se reclama en el login de su dueño (Fase 3,
+// DEMO_OWNER_GOOGLE_SUB); hasta entonces su PATCH da 403 para todos.
 import type { FastifyInstance } from "fastify";
 import { createBusinessSchema, updateBusinessSchema } from "@apartados/shared";
 import { requireAuth, requireBusinessOwner } from "../middleware/auth";

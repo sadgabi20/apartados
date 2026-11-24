@@ -1,6 +1,6 @@
 # Diseño de auth — Apartados
 
-> Estado: diseño. Fase 1 implementada y mergeada (PR #3). Fase 2 implementada en este PR. Fecha: 2026-11-23.
+> Estado: diseño. Fase 1 implementada y mergeada (PR #3). Fase 2 implementada y mergeada (PR #5). Fase 3 implementada en este PR. Fecha: 2026-11-24.
 > Contexto: PR #2 (agenda pública/privada + flujo manual por WhatsApp) ya está
 > mergeado. Hoy no existe auth de ningún tipo: `PATCH /businesses/:slug` y
 > `POST /bookings` con `source='business'` los puede llamar cualquiera, y las
@@ -452,12 +452,27 @@ de producción).
 
 ### Fase 3 — Migración de `barberia-demo` a un dueño real
 
-- Script / paso manual documentado: asignar `ownerId` de `barberia-demo` a la
-  cuenta de Axel (por `googleSub`, nunca por email a mano en un SQL sin verificar).
-- `ownerId` pasa a requerido en Prisma (migración) una vez que no quedan negocios
-  sin dueño. Quitar el seed sin dueño.
-- Limpieza: borrar el bypass `actor=business` sin sesión si quedara algún resto,
-  y revisar que `GET /businesses/:slug` no filtre datos del dueño.
+- El dueño se configura con su `googleSub` (estable, nunca por email) en
+  `DEMO_OWNER_GOOGLE_SUB` (Render en prod, `.env` en local). El seed no
+  puede crear la barbería con dueño: el id interno del `User` solo existe
+  después del primer login, y el store en memoria se resetea en cada
+  reinicio. Por eso la asignación ocurre en el login
+  (`services/demo-owner.ts`, `claimDemoBusiness`): si el `googleSub` del
+  que entra coincide con el configurado y la demo sigue sin dueño, se le
+  asigna. Idempotente y en cada login, así sobrevive a reinicios. Si la
+  demo ya tiene dueño, no se toca.
+- `GET /auth/me` devuelve el `googleSub` del propio dueño de la sesión
+  (solo a él, nunca en endpoints públicos) para que pueda copiarlo a la
+  variable sin tocar SQL ni logs.
+- `ownerId` pasa a requerido en Prisma (migración
+  `20261124133600_business_owner_required`: `SET NOT NULL` + FK a
+  `ON DELETE RESTRICT`) una vez que no queden negocios sin dueño.
+  Migración escrita a mano (el CLI no descarga el schema-engine en este
+  entorno); verificar con `prisma migrate deploy` cuando haya DB.
+- Limpieza: verificado que no queda resto del bypass `actor=business`
+  (Fase 2 ya lo cerró: `GET /availability` ignora el param y decide por
+  sesión), y que `GET /businesses/:slug` solo devuelve campos de
+  exhibición (`id`, `slug`, `name`, `agendaVisibility`).
 - **Verificar:** `barberia-demo` solo la administra Axel; el resto del flujo
   (reserva pública, manual, confirmar, webhook) sigue igual; demo del pitch
   (3 min) ensayada con la cuenta real.
