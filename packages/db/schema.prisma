@@ -112,6 +112,10 @@ model GoogleAccount {
   business     Business @relation(fields: [businessId], references: [id])
   calendarId   String
   accessToken  String?
+  // refreshToken: CIFRADO en reposo (AES-256-GCM, formato "v1:..." — ver
+  // apps/api/src/services/token-crypto.ts). Nunca en claro, nunca en logs
+  // ni en respuestas. La columna sigue siendo String porque el valor
+  // cifrado es texto: el cifrado es a nivel aplicación, sin migración.
   refreshToken String?
   createdAt    DateTime @default(now())
 }

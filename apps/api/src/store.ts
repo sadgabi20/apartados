@@ -17,6 +17,9 @@ export interface BusinessRecord {
   ownerId: string | null;
   calendarId: string | null;
   googleAccessToken: string | null;
+  // Refresh token CIFRADO en reposo (AES-256-GCM, formato "v1:..." — ver
+  // services/token-crypto.ts). Nunca en claro, nunca en logs ni en
+  // respuestas. Antes de usarlo hay que descifrarlo.
   googleRefreshToken: string | null;
 }
 
@@ -75,6 +78,9 @@ export interface AppointmentStore {
   getBusinessBySlug(slug: string): BusinessRecord | undefined;
   getBusiness(id: string): BusinessRecord | undefined;
   saveBusiness(b: BusinessRecord): void;
+  // Auth Fase 2: crear negocio (con ownerId de la sesión) y servicios.
+  createBusiness(b: Omit<BusinessRecord, "id">): BusinessRecord;
+  createService(s: Omit<ServiceRecord, "id">): ServiceRecord;
   listBusinessesByOwner(ownerId: string): BusinessRecord[];
   getService(id: string): ServiceRecord | undefined;
   listServices(businessId: string): ServiceRecord[];
@@ -131,6 +137,16 @@ export function createMemoryStore(): AppointmentStore {
     getBusiness: (id) => businesses.get(id),
     saveBusiness: (b) => {
       businesses.set(b.id, b);
+    },
+    createBusiness: (b) => {
+      const rec: BusinessRecord = { ...b, id: crypto.randomUUID() };
+      businesses.set(rec.id, rec);
+      return rec;
+    },
+    createService: (s) => {
+      const rec: ServiceRecord = { ...s, id: crypto.randomUUID() };
+      services.set(rec.id, rec);
+      return rec;
     },
     listBusinessesByOwner: (ownerId) =>
       [...businesses.values()].filter((b) => b.ownerId === ownerId),

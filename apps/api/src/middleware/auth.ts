@@ -31,7 +31,7 @@ function corsOrigins(): string[] {
  * navegador manda Origin y no está en la allowlist, se rechaza. Sin Origin
  * (curl, server-to-server) se permite: el chequeo es anti-CSRF de navegador.
  */
-function originAllowed(req: FastifyRequest): boolean {
+export function isOriginAllowed(req: FastifyRequest): boolean {
   if (req.method !== "POST" && req.method !== "PATCH" && req.method !== "DELETE") return true;
   const origin = req.headers.origin;
   if (!origin) return true;
@@ -50,7 +50,7 @@ export function requireAuth(store: AppointmentStore) {
     if (resolved.rotatedToken) {
       reply.header("Set-Cookie", sessionCookieHeader(resolved.rotatedToken, resolved.maxAgeSeconds));
     }
-    if (!originAllowed(req)) {
+    if (!isOriginAllowed(req)) {
       await reply.status(403).send({ error: "Origen no permitido" });
       return;
     }
@@ -59,20 +59,60 @@ export function requireAuth(store: AppointmentStore) {
   };
 }
 
+/**
+ * Auth opcional (Fase 2): para endpoints públicos con comportamiento distinto
+ * según quién llama (p. ej. /availability en agenda privada, POST /bookings
+ * con source='business'). Si hay una sesión válida en la cookie, deja el
+ * usuario en req.user; si no, no falla: el handler decide con req.user.
+ * La rotación de sesión se reemite igual que en requireAuth, para no
+ * invalidar la cookie del navegador.
+ */
+export function resolveOptionalAuth(store: AppointmentStore) {
+  return async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const cookies = parseCookies(req.headers.cookie);
+    const resolved = resolveSession(store, cookies[SESSION_COOKIE]);
+    if (!resolved) return;
+    if (resolved.rotatedToken) {
+      reply.header("Set-Cookie", sessionCookieHeader(resolved.rotatedToken, resolved.maxAgeSeconds));
+    }
+    req.user = resolved.user;
+    req.session = resolved.session;
+  };
+}
+
+/** Carga el negocio por slug y verifica que sea del usuario de la sesión. */
+async function checkBusinessOwner(
+  store: AppointmentStore,
+  req: FastifyRequest,
+  reply: FastifyReply,
+  slug: string | undefined,
+): Promise<void> {
+  const business = slug ? store.getBusinessBySlug(slug) : undefined;
+  if (!business) {
+    await reply.status(404).send({ error: "Negocio no encontrado" });
+    return;
+  }
+  // ownerId null (seed sin dueño) nunca coincide con nadie → 403 para
+  // todo el mundo hasta la Fase 3, que asigna barberia-demo a Axel.
+  if (!req.user || business.ownerId !== req.user.id) {
+    await reply.status(403).send({ error: "Este negocio no es tuyo" });
+    return;
+  }
+  req.business = business;
+}
+
 export function requireBusinessOwner(store: AppointmentStore) {
   return async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const slug = (req.params as { slug?: string }).slug;
-    const business = slug ? store.getBusinessBySlug(slug) : undefined;
-    if (!business) {
-      await reply.status(404).send({ error: "Negocio no encontrado" });
-      return;
-    }
-    // ownerId null (seed sin dueño) nunca coincide con nadie → 403 para
-    // todo el mundo hasta la Fase 3, que asigna barberia-demo a Axel.
-    if (!req.user || business.ownerId !== req.user.id) {
-      await reply.status(403).send({ error: "Este negocio no es tuyo" });
-      return;
-    }
-    req.business = business;
+    await checkBusinessOwner(store, req, reply, slug);
+  };
+}
+
+// Como requireBusinessOwner, pero el slug viene de ?slug= (p. ej.
+// GET /google/auth?slug=). Se usa con requireAuth antes.
+export function requireBusinessOwnerForQuery(store: AppointmentStore) {
+  return async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const slug = (req.query as { slug?: string }).slug;
+    await checkBusinessOwner(store, req, reply, slug);
   };
 }

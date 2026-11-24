@@ -13,6 +13,18 @@ export interface OAuthStatePayload {
   exp: number; // epoch ms
 }
 
+// Auth Fase 2 — state firmado para conectar el calendario
+// (GET /google/auth?slug=): ata el negocio y el usuario que inició el
+// flujo, no solo una ruta de retorno. Adiós al `state=slug` en claro:
+// eso permitía conectar el calendario de un atacante a un negocio ajeno.
+export interface CalendarOAuthStatePayload {
+  slug: string;
+  userId: string;
+  nonce: string;
+  redirect: string; // ruta interna a la que vuelve la web tras el callback
+  exp: number; // epoch ms
+}
+
 function getSecret(): string {
   const secret = process.env.OAUTH_STATE_SECRET ?? "";
   if (!secret) throw new Error("OAUTH_STATE_SECRET no configurado");
@@ -23,22 +35,17 @@ function b64url(input: string | Buffer): string {
   return Buffer.from(input).toString("base64url");
 }
 
-function signState(payload: OAuthStatePayload): string {
-  const data = b64url(JSON.stringify(payload));
+function signData(data: string): string {
   const sig = createHmac("sha256", getSecret()).update(data).digest();
   return `${data}.${sig.toString("base64url")}`;
 }
 
-export function createOAuthState(returnTo: string): { state: string; payload: OAuthStatePayload } {
-  const payload: OAuthStatePayload = {
-    nonce: randomBytes(16).toString("hex"),
-    returnTo,
-    exp: Date.now() + OAUTH_STATE_TTL_MS,
-  };
-  return { state: signState(payload), payload };
+function signPayload(payload: object): string {
+  return signData(b64url(JSON.stringify(payload)));
 }
 
-export function verifyOAuthState(state: string | undefined): OAuthStatePayload | null {
+/** Verifica la firma HMAC y parsea el JSON; null si no cuadra. */
+function parseVerifiedPayload<T>(state: string | undefined): T | null {
   if (!state) return null;
   const [data, sig] = state.split(".");
   if (!data || !sig) return null;
@@ -57,13 +64,57 @@ export function verifyOAuthState(state: string | undefined): OAuthStatePayload |
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
     return null;
   }
-  let payload: OAuthStatePayload;
   try {
-    payload = JSON.parse(Buffer.from(data, "base64url").toString("utf8")) as OAuthStatePayload;
+    return JSON.parse(Buffer.from(data, "base64url").toString("utf8")) as T;
   } catch {
     return null;
   }
+}
+
+export function createOAuthState(returnTo: string): { state: string; payload: OAuthStatePayload } {
+  const payload: OAuthStatePayload = {
+    nonce: randomBytes(16).toString("hex"),
+    returnTo,
+    exp: Date.now() + OAUTH_STATE_TTL_MS,
+  };
+  return { state: signPayload(payload), payload };
+}
+
+export function verifyOAuthState(state: string | undefined): OAuthStatePayload | null {
+  const payload = parseVerifiedPayload<OAuthStatePayload>(state);
   if (!payload || typeof payload.nonce !== "string" || typeof payload.returnTo !== "string") {
+    return null;
+  }
+  if (typeof payload.exp !== "number" || payload.exp <= Date.now()) return null;
+  return payload;
+}
+
+export function createCalendarOAuthState(input: {
+  slug: string;
+  userId: string;
+  redirect: string;
+}): { state: string; payload: CalendarOAuthStatePayload } {
+  const payload: CalendarOAuthStatePayload = {
+    slug: input.slug,
+    userId: input.userId,
+    nonce: randomBytes(16).toString("hex"),
+    redirect: input.redirect,
+    exp: Date.now() + OAUTH_STATE_TTL_MS,
+  };
+  return { state: signPayload(payload), payload };
+}
+
+export function verifyCalendarOAuthState(
+  state: string | undefined,
+): CalendarOAuthStatePayload | null {
+  const payload = parseVerifiedPayload<CalendarOAuthStatePayload>(state);
+  if (
+    !payload ||
+    typeof payload.slug !== "string" ||
+    typeof payload.userId !== "string" ||
+    typeof payload.nonce !== "string" ||
+    typeof payload.redirect !== "string"
+  ) {
     return null;
   }
   if (typeof payload.exp !== "number" || payload.exp <= Date.now()) return null;

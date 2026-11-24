@@ -3,10 +3,14 @@
 // La web NUNCA toca Pey ni Google directo: solo llama a apps/api.
 // El QR NO se genera aquí: se genera cuando el cliente abre
 // /confirmar/[id] y toca pagar (el QR de Pey expira en 600 s).
+// Auth Fase 2: con sesión (redirect a /login en 401, mensaje de negocio
+// ajeno en 403). La disponibilidad ya no pide actor=business: lo decide
+// la sesión en la API. Sección para conectar Google Calendar.
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import OwnerNav from "../../../components/owner-nav";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -22,6 +26,10 @@ interface Business {
   name: string;
   agendaVisibility: "public" | "private";
 }
+interface MeBusiness {
+  slug: string;
+  calendarConnected: boolean;
+}
 interface Appointment {
   id: string;
   status: string;
@@ -30,10 +38,12 @@ interface Appointment {
   expiresAt: string;
 }
 
-export default function BusinessPage() {
+function BusinessPageContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
+  const calendarStatus = searchParams.get("calendar");
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
   const [business, setBusiness] = useState<Business | null>(null);
@@ -44,13 +54,21 @@ export default function BusinessPage() {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [calendarConnected, setCalendarConnected] = useState<boolean | null>(null);
 
   // Auth Fase 1: sin sesión, a /login. La API es la que decide (401/403);
   // la web solo redirige. Los fetch con auth llevan credentials: "include"
-  // para que viaje la cookie httpOnly.
+  // para que viaje la cookie httpOnly. Aquí también se lee si el
+  // calendario está conectado (viene en /auth/me).
   useEffect(() => {
     fetch(`${API}/auth/me`, { credentials: "include" }).then((r) => {
       if (r.status === 401) router.replace(`/login?next=${encodeURIComponent(`/negocio/${slug}`)}`);
+      if (r.ok) {
+        r.json().then((d) => {
+          const mine = (d.businesses as MeBusiness[]).find((b) => b.slug === slug);
+          if (mine) setCalendarConnected(mine.calendarConnected);
+        }).catch(() => undefined);
+      }
     });
   }, [slug, router]);
 
@@ -66,7 +84,8 @@ export default function BusinessPage() {
 
   useEffect(() => {
     if (!business) return;
-    fetch(`${API}/availability?slug=${slug}&date=${date}&actor=business`, {
+    // Sin actor=business: la API decide por la sesión del dueño.
+    fetch(`${API}/availability?slug=${slug}&date=${date}`, {
       credentials: "include",
     })
       .then((r) => r.json())
@@ -140,7 +159,12 @@ export default function BusinessPage() {
 
   return (
     <main>
+      <OwnerNav currentSlug={slug} />
       <h1>Negocio — {business?.name ?? slug}</h1>
+      {calendarStatus === "connected" && <p>Calendario conectado ✓</p>}
+      {calendarStatus === "error" && (
+        <p style={{ color: "red" }}>No se pudo conectar el calendario, inténtalo de nuevo.</p>
+      )}
       {business && (
         <section>
           <p>
@@ -159,6 +183,14 @@ export default function BusinessPage() {
                 ? "Hacer agenda privada"
                 : "Hacer agenda pública"}
             </button>
+          </p>
+          <p>
+            Calendario:{" "}
+            {calendarConnected ? (
+              <strong>Conectado ✓</strong>
+            ) : (
+              <a href={`${API}/google/auth?slug=${slug}`}>Conectar Google Calendar</a>
+            )}
           </p>
         </section>
       )}
@@ -218,5 +250,13 @@ export default function BusinessPage() {
         </section>
       )}
     </main>
+  );
+}
+
+export default function BusinessPage() {
+  return (
+    <Suspense>
+      <BusinessPageContent />
+    </Suspense>
   );
 }
