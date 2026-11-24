@@ -10,10 +10,11 @@
 import type { FastifyInstance } from "fastify";
 import { createAppointmentSchema } from "@apartados/shared";
 import { createHold } from "../services/hold";
+import { isOriginAllowed, resolveOptionalAuth } from "../middleware/auth";
 import type { AppointmentStore } from "../store";
 
 export function bookingRoutes(app: FastifyInstance, store: AppointmentStore) {
-  app.post("/bookings", async (req, reply) => {
+  app.post("/bookings", { preHandler: resolveOptionalAuth(store) }, async (req, reply) => {
     const parsed = createAppointmentSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
@@ -24,6 +25,20 @@ export function bookingRoutes(app: FastifyInstance, store: AppointmentStore) {
     const service = store.getService(serviceId);
     if (!business || !service) {
       return reply.status(404).send({ error: "Negocio o servicio no encontrado" });
+    }
+    if (source === "business") {
+      // Cita manual (Fase 2): solo el dueño del businessId puede crearla.
+      // El body no autoriza: lo decide la sesión. Sin sesión del dueño,
+      // 403 aunque la agenda sea pública.
+      if (!req.user || business.ownerId !== req.user.id) {
+        return reply.status(403).send({
+          error: "Solo el dueño del negocio puede apartar citas manuales",
+        });
+      }
+      // Mutación autenticada: segunda barrera anti-CSRF además de SameSite.
+      if (!isOriginAllowed(req)) {
+        return reply.status(403).send({ error: "Origen no permitido" });
+      }
     }
     if (business.agendaVisibility === "private" && source !== "business") {
       return reply.status(403).send({

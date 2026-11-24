@@ -8,7 +8,7 @@ export default function Home() {
       </p>
       <p>
         ¿Eres el negocio?{" "}
-        <a href="/negocio/barberia-demo">Apartar cita para un cliente / agenda pública o privada</a>
+        <a href="/login">Entrar con Google</a> para gestionar tu agenda.
       </p>
     </main>
   );

@@ -2,25 +2,28 @@
 // Huecos de 1 h entre 10:00 y 18:00 (hora de Ciudad de México), menos lo
 // ocupado según freeBusy. Sin Google conectado, devuelve todos los huecos
 // con google: "not-configured" (no se inventa disponibilidad).
-// Agenda privada: sin actor=business devuelve 403 sin slots; el negocio
-// (página /negocio/[slug]) pide con actor=business y ve los huecos.
+// Agenda privada: solo el dueño (sesión) ve los huecos. El query param
+// ?actor=business YA NO autoriza por sí solo (Fase 2): antes cualquiera
+// podía pasarlo y saltarse la agenda privada; ahora lo decide la sesión
+// y el param se ignora.
 import type { FastifyInstance } from "fastify";
 import { getFreeBusy, overlaps } from "@apartados/google-calendar";
+import { resolveOptionalAuth } from "../middleware/auth";
 import type { AppointmentStore } from "../store";
 
 export function availabilityRoutes(app: FastifyInstance, store: AppointmentStore) {
-  app.get("/availability", async (req, reply) => {
-    const { slug, date, actor } = req.query as {
+  app.get("/availability", { preHandler: resolveOptionalAuth(store) }, async (req, reply) => {
+    const { slug, date } = req.query as {
       slug?: string;
       date?: string;
-      actor?: string;
     };
     if (!slug || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return reply.status(400).send({ error: "slug y date=YYYY-MM-DD requeridos" });
     }
     const business = store.getBusinessBySlug(slug);
     if (!business) return reply.status(404).send({ error: "Negocio no encontrado" });
-    if (business.agendaVisibility === "private" && actor !== "business") {
+    const isOwner = !!req.user && business.ownerId === req.user.id;
+    if (business.agendaVisibility === "private" && !isOwner) {
       return reply.status(403).send({
         error: "Agenda privada: contacta al negocio para apartar tu cita",
         visibility: "private",

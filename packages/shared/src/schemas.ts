@@ -17,6 +17,21 @@ export const updateBusinessSchema = z.object({
   agendaVisibility: z.enum(["public", "private"]),
 });
 
+// Auth Fase 2 — crear negocio + primer servicio (POST /businesses).
+// agendaVisibility es OBLIGATORIA, sin default: al crear un negocio se
+// pregunta siempre si la agenda es pública o privada (decisión de Axel §10).
+// slug: minúsculas, números y guiones; único (la API responde 409 si existe).
+export const createBusinessSchema = z.object({
+  name: z.string().min(1).max(100),
+  slug: z.string().regex(/^[a-z0-9-]+$/).min(1).max(60),
+  agendaVisibility: z.enum(["public", "private"]),
+  service: z.object({
+    name: z.string().min(1).max(100),
+    durationMin: z.number().int().min(15).max(480),
+    depositAmount: z.number().int().min(0).max(100000),
+  }),
+});
+
 export const createChargeSchema = z.object({
   amount: z.number().positive(),
   concept: z.string(),

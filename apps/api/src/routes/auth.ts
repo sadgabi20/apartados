@@ -150,10 +150,10 @@ export function authRoutes(app: FastifyInstance, store: AppointmentStore) {
     const target = isSafeReturnTo(payload.returnTo) && payload.returnTo !== ""
       ? payload.returnTo
       : (() => {
-          // Sin destino pedido: al primer negocio del usuario, o a la landing.
-          // (El /dashboard con selector es Fase 2; redirigir ahí hoy daría 404.)
+          // Sin destino pedido: al dashboard si ya tiene negocios, o al
+          // onboarding si es nuevo (Fase 2: ahí crea su primer negocio).
           const mine = store.listBusinessesByOwner(user.id);
-          return mine.length > 0 ? `/negocio/${mine[0].slug}` : "/";
+          return mine.length > 0 ? "/dashboard" : "/onboarding";
         })();
     reply.header("Set-Cookie", [clearState, sessionCookieHeader(token, maxAgeSeconds)]);
     return reply.redirect(`${config.webUrl}${target}`);
