@@ -13,6 +13,7 @@ import {
   sessionCookieHeader,
   SESSION_TTL_MS,
 } from "../services/session";
+import { claimDemoBusiness } from "../services/demo-owner";
 import {
   clearOAuthStateCookieHeader,
   createOAuthState,
@@ -145,6 +146,12 @@ export function authRoutes(app: FastifyInstance, store: AppointmentStore) {
     }
 
     const user = store.upsertUserByGoogleSub({ googleSub: sub, email, name, avatarUrl });
+    // Fase 3: si este es el googleSub configurado como dueño de la demo
+    // (DEMO_OWNER_GOOGLE_SUB), la barbería se le asigna aquí. Idempotente
+    // y en cada login, así sobrevive a reinicios del store en memoria.
+    if (claimDemoBusiness(store, sub, user.id)) {
+      req.log.info({ userId: user.id }, "barberia-demo reclamada por su dueño");
+    }
     const { token } = createSession(store, user.id, req.headers["user-agent"] ?? null);
     const maxAgeSeconds = Math.floor(SESSION_TTL_MS / 1000);
     const target = isSafeReturnTo(payload.returnTo) && payload.returnTo !== ""
@@ -170,7 +177,16 @@ export function authRoutes(app: FastifyInstance, store: AppointmentStore) {
       calendarConnected: !!b.googleAccessToken && !!b.calendarId,
     }));
     return {
-      user: { id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl },
+      // googleSub solo lo ve el propio dueño de la sesión: es su
+      // identificador estable de Google y lo necesita para ponerlo en
+      // DEMO_OWNER_GOOGLE_SUB (Fase 3). Nunca va en endpoints públicos.
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+        googleSub: user.googleSub,
+      },
       businesses,
     };
   });

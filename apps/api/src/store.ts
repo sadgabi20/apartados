@@ -12,8 +12,11 @@ export interface BusinessRecord {
   slug: string;
   name: string;
   agendaVisibility: AgendaVisibility;
-  // Dueño del negocio (googleSub de User). null = sin dueño (seed
-  // barberia-demo hasta la Fase 3): nadie puede administrarlo.
+  // Dueño del negocio (id interno de User). null = sin dueño todavía:
+  // la barbería demo nace sin dueño en el seed y se reclama en el primer
+  // login del googleSub configurado en DEMO_OWNER_GOOGLE_SUB (Fase 3,
+  // services/demo-owner.ts). Mientras no tenga dueño, sus endpoints
+  // protegidos dan 403 para todo el mundo.
   ownerId: string | null;
   calendarId: string | null;
   googleAccessToken: string | null;
@@ -109,8 +112,10 @@ export function createMemoryStore(): AppointmentStore {
   let nextNumRef = 1000000;
 
   // Negocio demo por defecto: barbería, anticipo $50 (decisión por defecto
-  // del sábado 21 nov; se cambia con una palabra). Sin dueño hasta la
-  // Fase 3 (ownerId null): sus endpoints protegidos dan 403 para todos.
+  // del sábado 21 nov; se cambia con una palabra). Nace sin dueño y se
+  // reclama en el login del googleSub de DEMO_OWNER_GOOGLE_SUB (Fase 3,
+  // services/demo-owner.ts): el seed no puede asignar dueño porque el id
+  // interno del usuario solo existe después de su primer login.
   const business: BusinessRecord = {
     id: "biz-barberia-demo",
     slug: "barberia-demo",

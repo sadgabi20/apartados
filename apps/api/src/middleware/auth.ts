@@ -92,8 +92,8 @@ async function checkBusinessOwner(
     await reply.status(404).send({ error: "Negocio no encontrado" });
     return;
   }
-  // ownerId null (seed sin dueño) nunca coincide con nadie → 403 para
-  // todo el mundo hasta la Fase 3, que asigna barberia-demo a Axel.
+  // ownerId null (demo aún sin reclamar) nunca coincide con nadie → 403
+  // para todo el mundo hasta que su dueño la reclama en el login (Fase 3).
   if (!req.user || business.ownerId !== req.user.id) {
     await reply.status(403).send({ error: "Este negocio no es tuyo" });
     return;

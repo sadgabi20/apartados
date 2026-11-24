@@ -65,6 +65,12 @@ Cuando el PR #3 (auth Fase 1) esté mergeado, añade también estas tres:
 | `AUTH_GOOGLE_REDIRECT_URI` | `https://<tu-api>.onrender.com/auth/google/callback` |
 | `OAUTH_STATE_SECRET` | Generado con `openssl rand -hex 32`, distinto por entorno |
 
+Cuando el PR de auth Fase 3 esté mergeado, añade también esta:
+
+| Variable | Valor |
+|---|---|
+| `DEMO_OWNER_GOOGLE_SUB` | El `googleSub` de tu cuenta de Google (la dueña de `barberia-demo`). Se obtiene entrando con Google y abriendo `https://<tu-api>.onrender.com/auth/me` en el navegador: copia el valor de `googleSub`. Después de poner la variable, Render redeploya solo; luego cierra sesión en la web y vuelve a entrar con Google para que la barbería se te asigne. Sin esta variable, `barberia-demo` sigue sin dueño y su PATCH da 403 para todos. |
+
 ## Paso 4 — Deploy y URL pública
 
 1. Dale a **Create Web Service** / **Apply**. Render hace el build y el
