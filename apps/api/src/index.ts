@@ -5,6 +5,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { createMemoryStore } from "./store";
+import { authRoutes } from "./routes/auth";
 import { availabilityRoutes } from "./routes/availability";
 import { bookingRoutes } from "./routes/bookings";
 import { businessRoutes } from "./routes/businesses";
@@ -27,7 +28,10 @@ async function main() {
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean);
-  await app.register(cors, { origin: corsOrigins });
+  // credentials: true — la cookie de sesión (httpOnly) tiene que viajar
+  // cross-origin en prod (web en Vercel, API en otro dominio). Orígenes
+  // explícitos, nunca "*".
+  await app.register(cors, { origin: corsOrigins, credentials: true });
 
   // El webhook de Pey se verifica sobre el cuerpo crudo: guardarlo antes
   // de parsear. Sin esto, la firma nunca cuadra.
@@ -45,6 +49,7 @@ async function main() {
   );
 
   app.get("/health", async () => ({ ok: true }));
+  authRoutes(app, store);
   availabilityRoutes(app, store);
   bookingRoutes(app, store);
   businessRoutes(app, store);

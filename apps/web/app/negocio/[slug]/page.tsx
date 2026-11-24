@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -32,6 +32,7 @@ interface Appointment {
 
 export default function BusinessPage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
@@ -43,6 +44,15 @@ export default function BusinessPage() {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+
+  // Auth Fase 1: sin sesión, a /login. La API es la que decide (401/403);
+  // la web solo redirige. Los fetch con auth llevan credentials: "include"
+  // para que viaje la cookie httpOnly.
+  useEffect(() => {
+    fetch(`${API}/auth/me`, { credentials: "include" }).then((r) => {
+      if (r.status === 401) router.replace(`/login?next=${encodeURIComponent(`/negocio/${slug}`)}`);
+    });
+  }, [slug, router]);
 
   useEffect(() => {
     fetch(`${API}/businesses/${slug}`)
@@ -56,7 +66,9 @@ export default function BusinessPage() {
 
   useEffect(() => {
     if (!business) return;
-    fetch(`${API}/availability?slug=${slug}&date=${date}&actor=business`)
+    fetch(`${API}/availability?slug=${slug}&date=${date}&actor=business`, {
+      credentials: "include",
+    })
       .then((r) => r.json())
       .then((d) => {
         setService(d.service ?? null);
@@ -71,10 +83,19 @@ export default function BusinessPage() {
     const res = await fetch(`${API}/businesses/${slug}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ agendaVisibility: next }),
     });
     const data = await res.json();
     if (!res.ok) {
+      if (res.status === 401) {
+        router.replace(`/login?next=${encodeURIComponent(`/negocio/${slug}`)}`);
+        return;
+      }
+      if (res.status === 403) {
+        setError("Este negocio pertenece a otra cuenta. ¿Entraste con el Google correcto?");
+        return;
+      }
       setError(data.error ?? "No se pudo cambiar la visibilidad.");
       return;
     }
@@ -91,6 +112,7 @@ export default function BusinessPage() {
     const res = await fetch(`${API}/bookings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({
         businessId: business.id,
         serviceId: service.id,

@@ -14,6 +14,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Auth Fase 1: solo el dueño del negocio se autentica ("Entrar con Google").
+// La identidad es googleSub (el "sub" del id_token), nunca el email.
+// El cliente final NO tiene login: su link /confirmar/[id] es el token.
+model User {
+  id         String    @id @default(cuid())
+  googleSub  String    @unique // "sub" del id_token: identidad estable, nunca cambia
+  email      String    @unique // solo para mostrar y contactar; NUNCA es la clave de identidad
+  name       String?
+  avatarUrl  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  sessions   Session[]
+  businesses Business[]
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique // SHA-256 del token; el token en claro solo existe en la cookie
+  expiresAt  DateTime
+  lastUsedAt DateTime @default(now())
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
 model Business {
   id        String        @id @default(cuid())
   slug      String        @unique
@@ -21,10 +49,17 @@ model Business {
   // Agenda pública (autoservicio en /b/[slug]) o privada (solo el
   // negocio aparta huecos y manda el link de confirmación/pago).
   agendaVisibility String @default("public")
+  // Dueño del negocio (1 dueño → N negocios). Nullable solo durante la
+  // migración: barberia-demo queda sin dueño hasta la Fase 3, y sus
+  // endpoints protegidos dan 403 para todo el mundo hasta entonces.
+  ownerId          String?
+  owner            User?   @relation(fields: [ownerId], references: [id])
   services  Service[]
   appointments Appointment[]
   googleAccount GoogleAccount?
   createdAt DateTime      @default(now())
+
+  @@index([ownerId])
 }
 
 model Service {
