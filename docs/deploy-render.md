@@ -15,9 +15,11 @@
   No hay build real: `tsc` no hace nada en este repo (no hay tsconfig en la
   API) y `tsx` corre el TypeScript directo.
 - `render.yaml`: Blueprint con el servicio web (plan free, región Oregon, la
-  más cercana a México), build `corepack enable && pnpm install
-  --frozen-lockfile`, start `pnpm --filter @apartados/api start`, health
-  check en `/health`.
+  más cercana a México), build `pnpm install --frozen-lockfile`, start
+  `pnpm --filter @apartados/api start`, health check en `/health`. Sin
+  `corepack enable`: en Render falla con `EROFS` porque intenta crear el
+  symlink de pnpm en `/usr/bin` (solo lectura); el runtime Node de Render
+  ya trae pnpm.
 - `.node-version`: `24.22.1` (la versión default actual de Render y la del
   entorno de desarrollo).
 
@@ -33,9 +35,9 @@
 1. En el dashboard: **New > Blueprint**.
 2. Conecta el repo `sadgabi20/apartados`, rama `main`.
 3. Render lee `render.yaml` y muestra el servicio `apartados-api`. Revisa
-   que diga: Runtime `Node`, Plan `Free`, Build Command `corepack enable &&
-   pnpm install --frozen-lockfile`, Start Command `pnpm --filter
-   @apartados/api start`, Health Check Path `/health`.
+   que diga: Runtime `Node`, Plan `Free`, Build Command `pnpm install
+   --frozen-lockfile`, Start Command `pnpm --filter @apartados/api start`,
+   Health Check Path `/health`.
 4. Si prefieres crearlo a mano en vez de Blueprint: **New > Web Service**,
    mismo repo y rama, con exactamente esos valores.
 
