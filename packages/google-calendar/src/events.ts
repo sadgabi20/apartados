@@ -2,7 +2,9 @@
 // Al elegir hueco: crear de inmediato un evento en espera, así freeBusy
 // ya lo ve ocupado. Webhook pagado -> evento a confirmado.
 // Sin pago en 10 min -> borrar el evento y liberar el hueco.
-const BASE = "https://www.googleapis.com/calendar/v3/calendars";
+import { googleApiBaseUrl, timedFetch } from "./timeout";
+
+const BASE = `${googleApiBaseUrl()}/calendar/v3/calendars`;
 
 async function googleFetch(
   accessToken: string,
@@ -10,14 +12,18 @@ async function googleFetch(
   method: string,
   body?: unknown,
 ): Promise<Record<string, unknown>> {
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
+  const res = await timedFetch(
+    `${BASE}${path}`,
+    {
+      method,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+    `Calendar ${method}`,
+  );
   if (!res.ok) {
     throw new Error(`Google Calendar ${method} failed: ${res.status} ${await res.text()}`);
   }

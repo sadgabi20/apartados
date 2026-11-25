@@ -72,6 +72,14 @@ Cuando el PR de auth Fase 3 esté mergeado, añade también esta:
 | `DEMO_OWNER_GOOGLE_SUB` | El `googleSub` de tu cuenta de Google (la dueña de `barberia-demo`). Se obtiene entrando con Google y abriendo `https://<tu-api>.onrender.com/auth/me` en el navegador: copia el valor de `googleSub`. Después de poner la variable, Render redeploya solo; luego cierra sesión en la web y vuelve a entrar con Google para que la barbería se te asigne. Sin esta variable, `barberia-demo` sigue sin dueño y su PATCH da 403 para todos. |
 | `DATABASE_URL` | La connection string de Supabase (Session pooler, puerto 5432): dashboard del proyecto > Connect > Direct > Session pooler, con tu contraseña en lugar de `[YOUR-DATABASE-PASSWORD]`. Sin ella la API arranca en memoria y pierde los datos al reiniciar; con ella usa Prisma + Postgres. Si la API no conecta con la URL tal cual, añade `?sslmode=require` al final. |
 
+Opcionales (tienen default en el código, no hace falta ponerlas en Render
+salvo que quieras cambiar el timeout):
+
+| Variable | Default | Para qué |
+|---|---|---|
+| `PEY_TIMEOUT_MS` | `240000` (4 min) | Cuánto espera la API a Pey al crear el QR. Tiene que ser mayor que los ~3 min que tarda Pey en responder en pruebas reales; si se agota, la cita sigue en hold y el pago se puede reintentar. |
+| `GOOGLE_TIMEOUT_MS` | `30000` (30 s) | Cuánto esperan las llamadas a Google Calendar y OAuth. |
+
 ## Paso 3b — Base de datos (Supabase): migraciones
 
 Render gratis no tiene pre-deploy commands, así que las migraciones de

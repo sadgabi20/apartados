@@ -2,6 +2,8 @@
 // - https://www.googleapis.com/auth/calendar.freebusy
 // - https://www.googleapis.com/auth/calendar.events.owned
 // No pedir el ámbito amplio `calendar`: es sensible y requiere revisión.
+import { googleOAuthBaseUrl, timedFetch } from "./timeout";
+
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar.freebusy",
   "https://www.googleapis.com/auth/calendar.events.owned",
@@ -37,11 +39,15 @@ export interface GoogleTokens {
 }
 
 async function tokenRequest(body: Record<string, string>): Promise<GoogleTokens> {
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(body),
-  });
+  const res = await timedFetch(
+    `${googleOAuthBaseUrl()}/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(body),
+    },
+    "OAuth",
+  );
   if (!res.ok) {
     throw new Error(`Google OAuth failed: ${res.status} ${await res.text()}`);
   }

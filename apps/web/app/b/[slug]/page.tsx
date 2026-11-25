@@ -47,6 +47,12 @@ export default function BookingPage() {
   const [qrPayload, setQrPayload] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  // Mientras se genera el QR, la hora YA está apartada: se muestra el
+  // hold y el "Generando QR…" en vez de dejar la UI colgada sin feedback.
+  // Pey tarda ~3 min en responder en pruebas reales; la API acota la
+  // espera a PEY_TIMEOUT_MS (240 s por defecto) y la cita sigue en hold
+  // para reintentar si el QR falla.
+  const [qrLoading, setQrLoading] = useState(false);
 
   useEffect(() => {
     fetch(`${API}/businesses/${slug}`)
@@ -88,6 +94,41 @@ export default function BookingPage() {
     return () => clearInterval(t);
   }, [appointment]);
 
+  // Pide el QR de una cita que ya está en hold. Si falla (timeout de
+  // Pey o error), la cita sigue apartada y se puede reintentar: no se
+  // borra el appointment del estado, a diferencia de antes, que dejaba
+  // una reserva muerta sin forma de pagarla.
+  async function requestQr(appointmentId: string, testAmount?: number) {
+    setError("");
+    setQrLoading(true);
+    try {
+      const pRes = await fetch(`${API}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointmentId,
+          ...(testAmount ? { amount: testAmount } : {}),
+        }),
+      });
+      const pData = await pRes.json();
+      if (!pRes.ok) {
+        setError(
+          typeof pData.error === "string"
+            ? pData.error
+            : "No se pudo generar el QR.",
+        );
+        return;
+      }
+      setAppointment(pData.appointment);
+      setStatus("hold");
+      setQrPayload(pData.qrPayload ?? JSON.stringify(pData.qr));
+    } catch {
+      setError("No se pudo contactar a la API (¿corre en :3001?)");
+    } finally {
+      setQrLoading(false);
+    }
+  }
+
   async function reserve(startAt: string, testAmount?: number) {
     setError("");
     if (!business || !service || !name || !phone) {
@@ -111,22 +152,11 @@ export default function BookingPage() {
       setError(bData.error ?? "No se pudo apartar la hora.");
       return;
     }
-    const pRes = await fetch(`${API}/payments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        appointmentId: bData.appointment.id,
-        ...(testAmount ? { amount: testAmount } : {}),
-      }),
-    });
-    const pData = await pRes.json();
-    if (!pRes.ok) {
-      setError(pData.error ?? "No se pudo generar el QR.");
-      return;
-    }
-    setAppointment(pData.appointment);
+    // La hora ya está apartada: guardarla ANTES de pedir el QR para que
+    // se vea mientras Pey tarda, y para que sobreviva si el QR falla.
+    setAppointment(bData.appointment);
     setStatus("hold");
-    setQrPayload(pData.qrPayload ?? JSON.stringify(pData.qr));
+    await requestQr(bData.appointment.id, testAmount);
   }
 
   if (business?.agendaVisibility === "private") {
@@ -161,7 +191,7 @@ export default function BookingPage() {
       {error && <p style={{ color: "red" }}>{error}</p>}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {slots.map((s) => (
-          <button key={s} onClick={() => reserve(s)}>
+          <button key={s} onClick={() => reserve(s)} disabled={qrLoading}>
             {s.slice(11, 16)}
           </button>
         ))}
@@ -178,6 +208,19 @@ export default function BookingPage() {
           <p>
             {appointment.startAt} · anticipo ${appointment.depositAmount} MXN
           </p>
+          {status === "hold" && !qrPayload && qrLoading && (
+            <p>
+              Tu hora está apartada… Generando QR… Esto puede tardar unos
+              minutos, no cierres la página.
+            </p>
+          )}
+          {status === "hold" && !qrPayload && !qrLoading && (
+            <p>
+              <button onClick={() => requestQr(appointment.id)}>
+                Reintentar pago
+              </button>
+            </p>
+          )}
           {status === "hold" && qrPayload && (
             <>
               {qrPayload.startsWith("http") || qrPayload.startsWith("data:image") ? (
