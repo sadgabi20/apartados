@@ -20,7 +20,7 @@ export function availabilityRoutes(app: FastifyInstance, store: AppointmentStore
     if (!slug || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return reply.status(400).send({ error: "slug y date=YYYY-MM-DD requeridos" });
     }
-    const business = store.getBusinessBySlug(slug);
+    const business = await store.getBusinessBySlug(slug);
     if (!business) return reply.status(404).send({ error: "Negocio no encontrado" });
     const isOwner = !!req.user && business.ownerId === req.user.id;
     if (business.agendaVisibility === "private" && !isOwner) {
@@ -29,7 +29,7 @@ export function availabilityRoutes(app: FastifyInstance, store: AppointmentStore
         visibility: "private",
       });
     }
-    const services = store.listServices(business.id);
+    const services = await store.listServices(business.id);
     if (services.length === 0) return reply.status(404).send({ error: "Sin servicios" });
     const service = services[0];
 

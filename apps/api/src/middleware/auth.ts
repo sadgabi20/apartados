@@ -41,7 +41,7 @@ export function isOriginAllowed(req: FastifyRequest): boolean {
 export function requireAuth(store: AppointmentStore) {
   return async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const cookies = parseCookies(req.headers.cookie);
-    const resolved = resolveSession(store, cookies[SESSION_COOKIE]);
+    const resolved = await resolveSession(store, cookies[SESSION_COOKIE]);
     if (!resolved) {
       reply.header("Set-Cookie", clearSessionCookieHeader());
       await reply.status(401).send({ error: "No autenticado" });
@@ -70,7 +70,7 @@ export function requireAuth(store: AppointmentStore) {
 export function resolveOptionalAuth(store: AppointmentStore) {
   return async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const cookies = parseCookies(req.headers.cookie);
-    const resolved = resolveSession(store, cookies[SESSION_COOKIE]);
+    const resolved = await resolveSession(store, cookies[SESSION_COOKIE]);
     if (!resolved) return;
     if (resolved.rotatedToken) {
       reply.header("Set-Cookie", sessionCookieHeader(resolved.rotatedToken, resolved.maxAgeSeconds));
@@ -87,7 +87,7 @@ async function checkBusinessOwner(
   reply: FastifyReply,
   slug: string | undefined,
 ): Promise<void> {
-  const business = slug ? store.getBusinessBySlug(slug) : undefined;
+  const business = slug ? await store.getBusinessBySlug(slug) : undefined;
   if (!business) {
     await reply.status(404).send({ error: "Negocio no encontrado" });
     return;

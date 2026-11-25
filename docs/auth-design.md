@@ -1,6 +1,6 @@
 # Diseño de auth — Apartados
 
-> Estado: diseño. Fase 1 implementada y mergeada (PR #3). Fase 2 implementada y mergeada (PR #5). Fase 3 implementada en este PR. Fecha: 2026-11-24.
+> Estado: diseño. Fase 1 implementada y mergeada (PR #3). Fase 2 implementada y mergeada (PR #5). Fase 3 implementada y mergeada (PR #7). Persistencia en Supabase/Postgres con Prisma: PR `feat/supabase-persistencia`. Fecha: 2026-11-24.
 > Contexto: PR #2 (agenda pública/privada + flujo manual por WhatsApp) ya está
 > mergeado. Hoy no existe auth de ningún tipo: `PATCH /businesses/:slug` y
 > `POST /bookings` con `source='business'` los puede llamar cualquiera, y las
@@ -123,7 +123,7 @@ en la fase 2 (§8), no se puede dejar el `state=slug` conviviendo con sesiones.
 
 ## 4. Modelo de datos
 
-### Prisma (`packages/db/schema.prisma`)
+### Prisma (`packages/db/prisma/schema.prisma`)
 
 ```prisma
 model User {

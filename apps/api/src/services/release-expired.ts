@@ -10,13 +10,13 @@ import type { GoogleCtx } from "./hold";
 
 export async function releaseExpiredHolds(input: {
   store: AppointmentStore;
-  resolveGoogle: (businessId: string) => GoogleCtx | null;
+  resolveGoogle: (businessId: string) => Promise<GoogleCtx | null>;
   now?: Date;
 }): Promise<string[]> {
-  const expired = input.store.listExpiredHolds(input.now ?? new Date());
+  const expired = await input.store.listExpiredHolds(input.now ?? new Date());
   const released: string[] = [];
   for (const appt of expired) {
-    const google = input.resolveGoogle(appt.businessId);
+    const google = await input.resolveGoogle(appt.businessId);
     if (google && appt.googleEventId) {
       try {
         await deleteEvent(google.accessToken, google.calendarId, appt.googleEventId);
@@ -24,7 +24,7 @@ export async function releaseExpiredHolds(input: {
         // Si el evento ya no existe en Google, igual liberamos la cita.
       }
     }
-    input.store.updateAppointment(appt.id, { status: "released" });
+    await input.store.updateAppointment(appt.id, { status: "released" });
     released.push(appt.id);
   }
   return released;

@@ -96,7 +96,7 @@ export function googleRoutes(app: FastifyInstance, store: AppointmentStore) {
     }
     // Un solo uso: la cookie se limpia aquí, en todos los caminos.
     const clearState = clearOAuthStateCookieHeader();
-    const business = store.getBusinessBySlug(payload.slug);
+    const business = await store.getBusinessBySlug(payload.slug);
     if (!business) {
       reply.header("Set-Cookie", clearState);
       return reply.status(404).send({ error: "Negocio no encontrado" });
@@ -124,7 +124,7 @@ export function googleRoutes(app: FastifyInstance, store: AppointmentStore) {
       req.log.error("GOOGLE_TOKEN_ENCRYPTION_KEY no configurado; no se guarda el refresh_token");
       return finishCalendarCallback(reply, config.webUrl, clearState, payload.redirect, "error", business.slug);
     }
-    store.saveBusiness({
+    await store.saveBusiness({
       ...business,
       calendarId: process.env.GOOGLE_TEST_CALENDAR_ID ?? "primary",
       googleAccessToken: tokens.access_token,

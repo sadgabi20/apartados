@@ -39,7 +39,7 @@ export function peyWebhookRoutes(app: FastifyInstance, store: AppointmentStore) 
     if (event.type !== "codi.qr.payment_received") {
       return { ok: true, ignored: event.type };
     }
-    const appointment = store.getAppointmentByNumRef(event.numRef);
+    const appointment = await store.getAppointmentByNumRef(event.numRef);
     if (!appointment) return reply.status(404).send({ error: "Cita no encontrada" });
     if (event.amount !== appointment.depositAmount) {
       app.log.warn(
@@ -47,8 +47,8 @@ export function peyWebhookRoutes(app: FastifyInstance, store: AppointmentStore) 
       );
       return reply.status(400).send({ error: "Monto distinto al anticipo" });
     }
-    const business = store.getBusiness(appointment.businessId);
-    const service = store.getService(appointment.serviceId);
+    const business = await store.getBusiness(appointment.businessId);
+    const service = await store.getService(appointment.serviceId);
     const google =
       business?.googleAccessToken && business.calendarId
         ? { accessToken: business.googleAccessToken, calendarId: business.calendarId }

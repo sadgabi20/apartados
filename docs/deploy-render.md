@@ -70,6 +70,33 @@ Cuando el PR de auth Fase 3 esté mergeado, añade también esta:
 | Variable | Valor |
 |---|---|
 | `DEMO_OWNER_GOOGLE_SUB` | El `googleSub` de tu cuenta de Google (la dueña de `barberia-demo`). Se obtiene entrando con Google y abriendo `https://<tu-api>.onrender.com/auth/me` en el navegador: copia el valor de `googleSub`. Después de poner la variable, Render redeploya solo; luego cierra sesión en la web y vuelve a entrar con Google para que la barbería se te asigne. Sin esta variable, `barberia-demo` sigue sin dueño y su PATCH da 403 para todos. |
+| `DATABASE_URL` | La connection string de Supabase (Session pooler, puerto 5432): dashboard del proyecto > Connect > Direct > Session pooler, con tu contraseña en lugar de `[YOUR-DATABASE-PASSWORD]`. Sin ella la API arranca en memoria y pierde los datos al reiniciar; con ella usa Prisma + Postgres. Si la API no conecta con la URL tal cual, añade `?sslmode=require` al final. |
+
+## Paso 3b — Base de datos (Supabase): migraciones
+
+Render gratis no tiene pre-deploy commands, así que las migraciones de
+Prisma se corren a mano desde tu PC cada vez que un PR traiga una
+migración nueva:
+
+1. En tu `.env` local pon el mismo `DATABASE_URL` de Supabase.
+2. Desde la raíz del repo: `pnpm --filter @apartados/db exec prisma migrate deploy`
+   (el schema está en `packages/db/prisma/schema.prisma`).
+3. Verifica: `prisma migrate status` debe decir que no hay migraciones
+   pendientes, y en el Table Editor de Supabase deben existir las tablas
+   `Business`, `Service`, `Appointment`, `Payment`, `GoogleAccount`,
+   `User` y `Session`.
+
+El comando es idempotente (no hace nada si ya están aplicadas). Las 3
+migraciones de este PR **ya están aplicadas** en el proyecto Supabase,
+así que este paso no hace falta hacerlo ahora: solo vuelve a hacer falta
+cuando un PR futuro traiga una migración nueva.
+
+La primera vez que la API arranca con `DATABASE_URL`, el seed crea
+`barberia-demo` en la base solo si su dueño ya existe (por
+`DEMO_OWNER_GOOGLE_SUB`); si no, la demo se crea en tu primer login con
+esa variable puesta (el reclamo de Fase 3). Después del deploy, verifica
+que `/b/barberia-demo` muestra los horarios y que `/negocio/barberia-demo`
+te deja entrar como dueño.
 
 ## Paso 4 — Deploy y URL pública
 
@@ -111,10 +138,12 @@ Cuando el PR de auth Fase 3 esté mergeado, añade también esta:
   Afecta a la demo de 3 minutos si la primera petición llega en frío, y a
   los holds de 10 minutos por la misma razón. El truco del punto anterior lo
   mitiga.
-- **El store es en memoria**: cada reinicio o redeploy borra las citas y
-  (cuando llegue el auth) las sesiones. Ya estaba aceptado para la demo.
+- **Persistencia**: con `DATABASE_URL` en Render, las citas, negocios y
+  sesiones viven en Supabase y sobreviven a reinicios y redeploys. Sin
+  esa variable, el store es en memoria: cada reinicio borra las citas y
+  las sesiones (así funcionaba la demo hasta ahora).
 - **750 horas gratis al mes**: un solo servicio 24/7 son ~720 h, así que
   alcanza para el hackatón (cierra el 12 dic 2026).
-- **Sin pre-deploy commands en plan gratis**: cuando haya base de datos y
-  migraciones de Prisma, el `prisma migrate deploy` tendrá que correrse a
-  mano o con un plan de pago. Hoy no hay DB conectada, así que no bloquea.
+- **Sin pre-deploy commands en plan gratis**: `prisma migrate deploy`
+  se corre a mano desde tu PC (ver Paso 3b) cada vez que un PR traiga una
+  migración nueva, antes del deploy.

@@ -24,7 +24,7 @@ function publicBusiness(business: BusinessRecord) {
 
 export function businessRoutes(app: FastifyInstance, store: AppointmentStore) {
   app.get("/businesses/:slug", async (req, reply) => {
-    const business = store.getBusinessBySlug((req.params as { slug: string }).slug);
+    const business = await store.getBusinessBySlug((req.params as { slug: string }).slug);
     if (!business) return reply.status(404).send({ error: "Negocio no encontrado" });
     return { business: publicBusiness(business) };
   });
@@ -35,10 +35,10 @@ export function businessRoutes(app: FastifyInstance, store: AppointmentStore) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const { name, slug, agendaVisibility, service } = parsed.data;
-    if (store.getBusinessBySlug(slug)) {
+    if (await store.getBusinessBySlug(slug)) {
       return reply.status(409).send({ error: "Ese slug ya está en uso, elige otro" });
     }
-    const business = store.createBusiness({
+    const business = await store.createBusiness({
       slug,
       name,
       agendaVisibility,
@@ -47,7 +47,7 @@ export function businessRoutes(app: FastifyInstance, store: AppointmentStore) {
       googleAccessToken: null,
       googleRefreshToken: null,
     });
-    const createdService = store.createService({
+    const createdService = await store.createService({
       businessId: business.id,
       name: service.name,
       durationMin: service.durationMin,
@@ -70,7 +70,7 @@ export function businessRoutes(app: FastifyInstance, store: AppointmentStore) {
       // requireBusinessOwner ya cargó el negocio y verificó la propiedad.
       const business = req.business!;
       const updated = { ...business, agendaVisibility: parsed.data.agendaVisibility };
-      store.saveBusiness(updated);
+      await store.saveBusiness(updated);
       return { business: publicBusiness(updated) };
     },
   );

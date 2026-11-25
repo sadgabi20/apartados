@@ -17,6 +17,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@apartados/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@apartados/google-calendar':
         specifier: workspace:*
         version: link:../../packages/google-calendar
@@ -78,7 +81,6 @@ importers:
       '@prisma/client':
         specifier: ^5.0.0
         version: 5.22.0(prisma@5.22.0)
-    devDependencies:
       prisma:
         specifier: ^5.0.0
         version: 5.22.0
