@@ -69,14 +69,14 @@ export interface ResolvedSession {
   maxAgeSeconds: number;
 }
 
-export function createSession(
+export async function createSession(
   store: AppointmentStore,
   userId: string,
   userAgent: string | null,
-): { session: SessionRecord; token: string } {
+): Promise<{ session: SessionRecord; token: string }> {
   const token = newSessionToken();
   const now = Date.now();
-  const session = store.createSession({
+  const session = await store.createSession({
     userId,
     tokenHash: hashToken(token),
     expiresAt: new Date(now + SESSION_TTL_MS).toISOString(),
@@ -90,21 +90,21 @@ export function createSession(
  * Valida el token de la cookie. Devuelve null si no hay sesión, expiró
  * o fue revocada. Rota el token si lastUsedAt tiene más de 24 h.
  */
-export function resolveSession(
+export async function resolveSession(
   store: AppointmentStore,
   token: string | undefined,
-): ResolvedSession | null {
+): Promise<ResolvedSession | null> {
   if (!token) return null;
-  const session = store.getSessionByTokenHash(hashToken(token));
+  const session = await store.getSessionByTokenHash(hashToken(token));
   if (!session) return null;
   const now = Date.now();
   if (new Date(session.expiresAt).getTime() <= now) {
-    store.deleteSession(session.id);
+    await store.deleteSession(session.id);
     return null;
   }
-  const user = store.getUserById(session.userId);
+  const user = await store.getUserById(session.userId);
   if (!user) {
-    store.deleteSession(session.id);
+    await store.deleteSession(session.id);
     return null;
   }
   const lastUsed = new Date(session.lastUsedAt).getTime();
@@ -119,11 +119,11 @@ export function resolveSession(
   const absoluteMax = new Date(session.createdAt).getTime() + SESSION_MAX_MS;
   const newExpiresAt = Math.min(now + SESSION_TTL_MS, absoluteMax);
   if (newExpiresAt <= now) {
-    store.deleteSession(session.id);
+    await store.deleteSession(session.id);
     return null;
   }
   const newToken = newSessionToken();
-  const rotated = store.updateSession(session.id, {
+  const rotated = await store.updateSession(session.id, {
     tokenHash: hashToken(newToken),
     expiresAt: new Date(newExpiresAt).toISOString(),
     lastUsedAt: new Date(now).toISOString(),

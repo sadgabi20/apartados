@@ -29,8 +29,9 @@ export async function confirmAppointment(input: {
       },
     );
   }
-  return store.updateAppointment(appointment.id, {
+  const updated = await store.updateAppointment(appointment.id, {
     status: "confirmed",
     transactionId: input.transactionId,
-  }) as AppointmentRecord;
+  });
+  return updated as AppointmentRecord;
 }

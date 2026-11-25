@@ -62,7 +62,7 @@ export async function createHold(input: {
   const expiresAt = new Date(
     Date.now() + (input.holdMinutes ?? 10) * 60_000,
   ).toISOString();
-  return input.store.createAppointment({
+  return await input.store.createAppointment({
     businessId: input.businessId,
     serviceId: input.serviceId,
     startAt,

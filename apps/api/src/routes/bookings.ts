@@ -21,8 +21,8 @@ export function bookingRoutes(app: FastifyInstance, store: AppointmentStore) {
     }
     const { businessId, serviceId, startAt, customerName, customerPhone, source } =
       parsed.data;
-    const business = store.getBusiness(businessId);
-    const service = store.getService(serviceId);
+    const business = await store.getBusiness(businessId);
+    const service = await store.getService(serviceId);
     if (!business || !service) {
       return reply.status(404).send({ error: "Negocio o servicio no encontrado" });
     }
@@ -74,10 +74,10 @@ export function bookingRoutes(app: FastifyInstance, store: AppointmentStore) {
   });
 
   app.get("/appointments/:id", async (req, reply) => {
-    const appointment = store.getAppointment((req.params as { id: string }).id);
+    const appointment = await store.getAppointment((req.params as { id: string }).id);
     if (!appointment) return reply.status(404).send({ error: "Cita no encontrada" });
-    const business = store.getBusiness(appointment.businessId);
-    const service = store.getService(appointment.serviceId);
+    const business = await store.getBusiness(appointment.businessId);
+    const service = await store.getService(appointment.serviceId);
     return {
       appointment,
       business: business

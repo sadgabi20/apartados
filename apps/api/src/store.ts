@@ -1,8 +1,13 @@
-// Store en memoria para el arranque del sábado — SOLO demo local.
-// La tienda de producción es Prisma + Supabase/Postgres
-// (packages/db/schema.prisma). Cuando DATABASE_URL esté lista, este
-// módulo se sustituye por el cliente Prisma sin tocar las rutas:
-// los servicios solo usan esta interfaz.
+// Store de Apartados: la interfaz que usan rutas y servicios.
+// Hay dos implementaciones con el mismo contrato:
+//   - Memoria (createMemoryStore, este archivo): dev local sin base.
+//     Se pierde al reiniciar, igual que antes.
+//   - Prisma + Supabase/Postgres (store-prisma.ts): producción, cuando
+//     DATABASE_URL está configurado. Los datos sobreviven a reinicios.
+// La interfaz es ASÍNCRONA en ambas: la de Prisma habla con la base por
+// red y la de memoria resuelve promesas al instante, así las rutas no
+// distinguen qué store hay detrás (todo con await).
+// Los servicios solo usan esta interfaz: nunca tocan Prisma directo.
 export type AppointmentStatus = "hold" | "confirmed" | "released" | "cancelled";
 
 export type AgendaVisibility = "public" | "private";
@@ -13,10 +18,12 @@ export interface BusinessRecord {
   name: string;
   agendaVisibility: AgendaVisibility;
   // Dueño del negocio (id interno de User). null = sin dueño todavía:
-  // la barbería demo nace sin dueño en el seed y se reclama en el primer
-  // login del googleSub configurado en DEMO_OWNER_GOOGLE_SUB (Fase 3,
-  // services/demo-owner.ts). Mientras no tenga dueño, sus endpoints
-  // protegidos dan 403 para todo el mundo.
+  // la barbería demo nace sin dueño en el seed de memoria y se reclama
+  // en el primer login del googleSub configurado en DEMO_OWNER_GOOGLE_SUB
+  // (Fase 3, services/demo-owner.ts). Mientras no tenga dueño, sus
+  // endpoints protegidos dan 403 para todo el mundo.
+  // En Prisma (store-prisma.ts) ownerId es NOT NULL desde la Fase 3:
+  // el seed de base crea la demo solo cuando ya existe su dueño.
   ownerId: string | null;
   calendarId: string | null;
   googleAccessToken: string | null;
@@ -66,7 +73,7 @@ export interface AppointmentRecord {
   status: AppointmentStatus;
   depositAmount: number;
   // Referencia numérica para Pey: hasta 7 dígitos, única por cita.
-  // Pey rechaza el UUID (400 "Numeric reference must be up to 7 digits").
+  // Pey rechaza el UUID (400 "Numeric reference must be up to 7 dígitos").
   numRef: string;
   googleEventId: string | null;
   peyQrId: string | null;
@@ -78,28 +85,28 @@ export interface AppointmentRecord {
 }
 
 export interface AppointmentStore {
-  getBusinessBySlug(slug: string): BusinessRecord | undefined;
-  getBusiness(id: string): BusinessRecord | undefined;
-  saveBusiness(b: BusinessRecord): void;
+  getBusinessBySlug(slug: string): Promise<BusinessRecord | undefined>;
+  getBusiness(id: string): Promise<BusinessRecord | undefined>;
+  saveBusiness(b: BusinessRecord): Promise<void>;
   // Auth Fase 2: crear negocio (con ownerId de la sesión) y servicios.
-  createBusiness(b: Omit<BusinessRecord, "id">): BusinessRecord;
-  createService(s: Omit<ServiceRecord, "id">): ServiceRecord;
-  listBusinessesByOwner(ownerId: string): BusinessRecord[];
-  getService(id: string): ServiceRecord | undefined;
-  listServices(businessId: string): ServiceRecord[];
-  createAppointment(a: Omit<AppointmentRecord, "id" | "createdAt" | "numRef"> & { id?: string; numRef?: string }): AppointmentRecord;
-  getAppointment(id: string): AppointmentRecord | undefined;
-  getAppointmentByNumRef(numRef: string): AppointmentRecord | undefined;
-  updateAppointment(id: string, patch: Partial<AppointmentRecord>): AppointmentRecord | undefined;
-  listExpiredHolds(now: Date): AppointmentRecord[];
+  createBusiness(b: Omit<BusinessRecord, "id"> & { id?: string }): Promise<BusinessRecord>;
+  createService(s: Omit<ServiceRecord, "id"> & { id?: string }): Promise<ServiceRecord>;
+  listBusinessesByOwner(ownerId: string): Promise<BusinessRecord[]>;
+  getService(id: string): Promise<ServiceRecord | undefined>;
+  listServices(businessId: string): Promise<ServiceRecord[]>;
+  createAppointment(a: Omit<AppointmentRecord, "id" | "createdAt" | "numRef"> & { id?: string; numRef?: string }): Promise<AppointmentRecord>;
+  getAppointment(id: string): Promise<AppointmentRecord | undefined>;
+  getAppointmentByNumRef(numRef: string): Promise<AppointmentRecord | undefined>;
+  updateAppointment(id: string, patch: Partial<AppointmentRecord>): Promise<AppointmentRecord | undefined>;
+  listExpiredHolds(now: Date): Promise<AppointmentRecord[]>;
   // Auth Fase 1: upsert por googleSub (la identidad es el sub, no el email).
-  upsertUserByGoogleSub(u: Omit<UserRecord, "id" | "createdAt" | "updatedAt">): UserRecord;
-  getUserById(id: string): UserRecord | undefined;
-  createSession(s: Omit<SessionRecord, "id" | "createdAt">): SessionRecord;
-  getSessionByTokenHash(tokenHash: string): SessionRecord | undefined;
-  updateSession(id: string, patch: Partial<SessionRecord>): SessionRecord | undefined;
-  deleteSession(id: string): void;
-  deleteSessionsByUserId(userId: string): void;
+  upsertUserByGoogleSub(u: Omit<UserRecord, "id" | "createdAt" | "updatedAt">): Promise<UserRecord>;
+  getUserById(id: string): Promise<UserRecord | undefined>;
+  createSession(s: Omit<SessionRecord, "id" | "createdAt">): Promise<SessionRecord>;
+  getSessionByTokenHash(tokenHash: string): Promise<SessionRecord | undefined>;
+  updateSession(id: string, patch: Partial<SessionRecord>): Promise<SessionRecord | undefined>;
+  deleteSession(id: string): Promise<void>;
+  deleteSessionsByUserId(userId: string): Promise<void>;
 }
 
 export function createMemoryStore(): AppointmentStore {
@@ -137,25 +144,25 @@ export function createMemoryStore(): AppointmentStore {
   services.set(service.id, service);
 
   return {
-    getBusinessBySlug: (slug) =>
+    getBusinessBySlug: async (slug) =>
       [...businesses.values()].find((b) => b.slug === slug),
-    getBusiness: (id) => businesses.get(id),
-    saveBusiness: (b) => {
+    getBusiness: async (id) => businesses.get(id),
+    saveBusiness: async (b) => {
       businesses.set(b.id, b);
     },
-    createBusiness: (b) => {
-      const rec: BusinessRecord = { ...b, id: crypto.randomUUID() };
+    createBusiness: async (b) => {
+      const rec: BusinessRecord = { ...b, id: b.id ?? crypto.randomUUID() };
       businesses.set(rec.id, rec);
       return rec;
     },
-    createService: (s) => {
-      const rec: ServiceRecord = { ...s, id: crypto.randomUUID() };
+    createService: async (s) => {
+      const rec: ServiceRecord = { ...s, id: s.id ?? crypto.randomUUID() };
       services.set(rec.id, rec);
       return rec;
     },
-    listBusinessesByOwner: (ownerId) =>
+    listBusinessesByOwner: async (ownerId) =>
       [...businesses.values()].filter((b) => b.ownerId === ownerId),
-    upsertUserByGoogleSub: (u) => {
+    upsertUserByGoogleSub: async (u) => {
       const now = new Date().toISOString();
       const existing = [...users.values()].find((x) => x.googleSub === u.googleSub);
       if (existing) {
@@ -169,33 +176,33 @@ export function createMemoryStore(): AppointmentStore {
       users.set(rec.id, rec);
       return rec;
     },
-    getUserById: (id) => users.get(id),
-    createSession: (s) => {
+    getUserById: async (id) => users.get(id),
+    createSession: async (s) => {
       const rec: SessionRecord = { ...s, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
       sessions.set(rec.id, rec);
       return rec;
     },
-    getSessionByTokenHash: (tokenHash) =>
+    getSessionByTokenHash: async (tokenHash) =>
       [...sessions.values()].find((s) => s.tokenHash === tokenHash),
-    updateSession: (id, patch) => {
+    updateSession: async (id, patch) => {
       const rec = sessions.get(id);
       if (!rec) return undefined;
       const next = { ...rec, ...patch };
       sessions.set(id, next);
       return next;
     },
-    deleteSession: (id) => {
+    deleteSession: async (id) => {
       sessions.delete(id);
     },
-    deleteSessionsByUserId: (userId) => {
+    deleteSessionsByUserId: async (userId) => {
       for (const s of [...sessions.values()]) {
         if (s.userId === userId) sessions.delete(s.id);
       }
     },
-    getService: (id) => services.get(id),
-    listServices: (businessId) =>
+    getService: async (id) => services.get(id),
+    listServices: async (businessId) =>
       [...services.values()].filter((s) => s.businessId === businessId),
-    createAppointment: (a) => {
+    createAppointment: async (a) => {
       const rec: AppointmentRecord = {
         ...a,
         id: a.id ?? crypto.randomUUID(),
@@ -205,17 +212,17 @@ export function createMemoryStore(): AppointmentStore {
       appointments.set(rec.id, rec);
       return rec;
     },
-    getAppointment: (id) => appointments.get(id),
-    getAppointmentByNumRef: (numRef) =>
+    getAppointment: async (id) => appointments.get(id),
+    getAppointmentByNumRef: async (numRef) =>
       [...appointments.values()].find((a) => a.numRef === numRef),
-    updateAppointment: (id, patch) => {
+    updateAppointment: async (id, patch) => {
       const rec = appointments.get(id);
       if (!rec) return undefined;
       const next = { ...rec, ...patch };
       appointments.set(id, next);
       return next;
     },
-    listExpiredHolds: (now) =>
+    listExpiredHolds: async (now) =>
       [...appointments.values()].filter(
         (a) => a.status === "hold" && new Date(a.expiresAt) <= now,
       ),

@@ -1,0 +1,122 @@
+// Apartados — Prisma + Supabase/Postgres
+// Tablas clave según la estructura entregada el 21 nov 2026.
+// Appointment une todo: businessId, serviceId, startAt/endAt,
+// status hold | confirmed | released | cancelled, depositAmount,
+// googleEventId, peyQrId, transactionId, customerName/Phone.
+// numRef (referencia Pey) = numérico de hasta 7 dígitos, único por cita
+// (Pey rechaza el UUID: 400 "Numeric reference must be up to 7 digits").
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Auth Fase 1: solo el dueño del negocio se autentica ("Entrar con Google").
+// La identidad es googleSub (el "sub" del id_token), nunca el email.
+// El cliente final NO tiene login: su link /confirmar/[id] es el token.
+model User {
+  id         String    @id @default(cuid())
+  googleSub  String    @unique // "sub" del id_token: identidad estable, nunca cambia
+  email      String    @unique // solo para mostrar y contactar; NUNCA es la clave de identidad
+  name       String?
+  avatarUrl  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  sessions   Session[]
+  businesses Business[]
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique // SHA-256 del token; el token en claro solo existe en la cookie
+  expiresAt  DateTime
+  lastUsedAt DateTime @default(now())
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Business {
+  id        String        @id @default(cuid())
+  slug      String        @unique
+  name      String
+  // Agenda pública (autoservicio en /b/[slug]) o privada (solo el
+  // negocio aparta huecos y manda el link de confirmación/pago).
+  agendaVisibility String @default("public")
+  // Dueño del negocio (1 dueño → N negocios). Requerido desde la Fase 3:
+  // barberia-demo ya tiene dueño real (aaxelaltamirano@gmail.com, por
+  // googleSub) y ningún negocio puede existir sin dueño. La migración
+  // 20261124133600_business_owner_required lo vuelve NOT NULL.
+  ownerId          String
+  owner            User    @relation(fields: [ownerId], references: [id])
+  services  Service[]
+  appointments Appointment[]
+  googleAccount GoogleAccount?
+  createdAt DateTime      @default(now())
+
+  @@index([ownerId])
+}
+
+model Service {
+  id             String        @id @default(cuid())
+  businessId     String
+  business       Business      @relation(fields: [businessId], references: [id])
+  name           String
+  durationMin    Int
+  depositAmount  Int           // MXN, p. ej. 50 para la demo
+  appointments   Appointment[]
+}
+
+model Appointment {
+  id             String   @id @default(cuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id])
+  serviceId      String
+  service        Service  @relation(fields: [serviceId], references: [id])
+  startAt        DateTime
+  endAt          DateTime
+  status         String   // hold | confirmed | released | cancelled
+  depositAmount  Int
+  numRef         String   @unique // referencia numérica Pey, máx. 7 dígitos
+  googleEventId  String?
+  peyQrId        String?
+  transactionId  String?
+  customerName   String?
+  customerPhone  String?
+  payments       Payment[]
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime // fin del hold: createdAt + 10 min (cliente) o 60 min (negocio)
+}
+
+model Payment {
+  id            String      @id @default(cuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  amount        Int
+  numRef        String      // = Appointment.id
+  transactionId String?
+  codiQrId      String?
+  status        String      // pending | paid
+  datePaid      DateTime?
+  createdAt     DateTime    @default(now())
+}
+
+model GoogleAccount {
+  id           String   @id @default(cuid())
+  businessId   String   @unique
+  business     Business @relation(fields: [businessId], references: [id])
+  calendarId   String
+  accessToken  String?
+  // refreshToken: CIFRADO en reposo (AES-256-GCM, formato "v1:..." — ver
+  // apps/api/src/services/token-crypto.ts). Nunca en claro, nunca en logs
+  // ni en respuestas. La columna sigue siendo String porque el valor
+  // cifrado es texto: el cifrado es a nivel aplicación, sin migración.
+  refreshToken String?
+  createdAt    DateTime @default(now())
+}

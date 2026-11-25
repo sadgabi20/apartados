@@ -14,7 +14,7 @@ export function paymentRoutes(app: FastifyInstance, store: AppointmentStore) {
     if (!body?.appointmentId) {
       return reply.status(400).send({ error: "appointmentId requerido" });
     }
-    const appointment = store.getAppointment(body.appointmentId);
+    const appointment = await store.getAppointment(body.appointmentId);
     if (!appointment) return reply.status(404).send({ error: "Cita no encontrada" });
     if (appointment.status !== "hold") {
       return reply.status(409).send({ error: `La cita está ${appointment.status}, no en espera` });
@@ -41,7 +41,7 @@ export function paymentRoutes(app: FastifyInstance, store: AppointmentStore) {
         error: `No se pudo generar el QR de pago: ${message}`,
       });
     }
-    const updated = store.updateAppointment(appointment.id, {
+    const updated = await store.updateAppointment(appointment.id, {
       depositAmount: amount,
       peyQrId: typeof qr.codiQrId === "string" ? qr.codiQrId : null,
     });

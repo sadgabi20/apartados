@@ -145,23 +145,24 @@ export function authRoutes(app: FastifyInstance, store: AppointmentStore) {
       return reply.redirect(`${config.webUrl}/login?error=google`);
     }
 
-    const user = store.upsertUserByGoogleSub({ googleSub: sub, email, name, avatarUrl });
+    const user = await store.upsertUserByGoogleSub({ googleSub: sub, email, name, avatarUrl });
     // Fase 3: si este es el googleSub configurado como dueño de la demo
     // (DEMO_OWNER_GOOGLE_SUB), la barbería se le asigna aquí. Idempotente
     // y en cada login, así sobrevive a reinicios del store en memoria.
-    if (claimDemoBusiness(store, sub, user.id)) {
+    if (await claimDemoBusiness(store, sub, user.id)) {
       req.log.info({ userId: user.id }, "barberia-demo reclamada por su dueño");
     }
-    const { token } = createSession(store, user.id, req.headers["user-agent"] ?? null);
+    const { token } = await createSession(store, user.id, req.headers["user-agent"] ?? null);
     const maxAgeSeconds = Math.floor(SESSION_TTL_MS / 1000);
-    const target = isSafeReturnTo(payload.returnTo) && payload.returnTo !== ""
-      ? payload.returnTo
-      : (() => {
-          // Sin destino pedido: al dashboard si ya tiene negocios, o al
-          // onboarding si es nuevo (Fase 2: ahí crea su primer negocio).
-          const mine = store.listBusinessesByOwner(user.id);
-          return mine.length > 0 ? "/dashboard" : "/onboarding";
-        })();
+    // Sin destino pedido: al dashboard si ya tiene negocios, o al
+    // onboarding si es nuevo (Fase 2: ahí crea su primer negocio).
+    let target = "/onboarding";
+    if (isSafeReturnTo(payload.returnTo) && payload.returnTo !== "") {
+      target = payload.returnTo;
+    } else {
+      const mine = await store.listBusinessesByOwner(user.id);
+      target = mine.length > 0 ? "/dashboard" : "/onboarding";
+    }
     reply.header("Set-Cookie", [clearState, sessionCookieHeader(token, maxAgeSeconds)]);
     return reply.redirect(`${config.webUrl}${target}`);
   });
@@ -169,7 +170,7 @@ export function authRoutes(app: FastifyInstance, store: AppointmentStore) {
   // GET /auth/me — quién soy + mis negocios. 401 sin sesión.
   app.get("/auth/me", { preHandler: requireAuth(store) }, async (req) => {
     const user = req.user!;
-    const businesses = store.listBusinessesByOwner(user.id).map((b) => ({
+    const businesses = (await store.listBusinessesByOwner(user.id)).map((b) => ({
       id: b.id,
       slug: b.slug,
       name: b.name,
@@ -193,7 +194,7 @@ export function authRoutes(app: FastifyInstance, store: AppointmentStore) {
 
   // POST /auth/logout — borra la sesión y limpia la cookie.
   app.post("/auth/logout", { preHandler: requireAuth(store) }, async (req, reply) => {
-    if (req.session) store.deleteSession(req.session.id);
+    if (req.session) await store.deleteSession(req.session.id);
     reply.header("Set-Cookie", clearSessionCookieHeader());
     return { ok: true };
   });

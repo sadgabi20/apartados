@@ -2,9 +2,14 @@
 // Regla: apps/web nunca toca Pey ni Google directo. Solo llama a apps/api.
 // La api es la única que crea la cita en espera, genera el QR,
 // verifica el webhook y mueve el evento en Google de en espera a confirmada.
+//
+// Store: con DATABASE_URL configurado, Prisma + Supabase/Postgres
+// (store-prisma.ts): los datos sobreviven a reinicios y redeploys.
+// Sin DATABASE_URL, store en memoria (dev local): se pierde al reiniciar.
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { createMemoryStore } from "./store";
+import type { AppointmentStore } from "./store";
 import { authRoutes } from "./routes/auth";
 import { availabilityRoutes } from "./routes/availability";
 import { bookingRoutes } from "./routes/bookings";
@@ -15,9 +20,27 @@ import { googleRoutes } from "./routes/google";
 import { releaseExpiredHolds } from "./services/release-expired";
 
 const app = Fastify({ logger: true });
-const store = createMemoryStore();
+
+async function createStore(): Promise<AppointmentStore> {
+  if (!process.env.DATABASE_URL) {
+    app.log.warn(
+      "DATABASE_URL no configurado: store en memoria (citas, sesiones y calendario se pierden al reiniciar). En prod, pon DATABASE_URL en Render (ver docs/deploy-render.md).",
+    );
+    return createMemoryStore();
+  }
+  // Import dinámico: sin DATABASE_URL la API no necesita el cliente
+  // Prisma generado (ni el query engine de Prisma).
+  const { PrismaClient } = await import("@apartados/db");
+  const { createPrismaStore } = await import("./store-prisma");
+  const prisma = new PrismaClient();
+  // createPrismaStore conecta y corre el seed; si la base no responde,
+  // el error sube y el proceso falla rápido (mejor que arrancar en
+  // memoria sin avisar y perder datos en prod).
+  return createPrismaStore(prisma);
+}
 
 async function main() {
+  const store = await createStore();
   // CORS: la web (otro origen/puerto) llama a esta API desde el navegador.
   // Sin esto el navegador bloquea todos los fetch y el preflight OPTIONS
   // da 404. Orígenes permitidos por env, separados por coma; por defecto
@@ -58,8 +81,8 @@ async function main() {
   googleRoutes(app, store);
 
   // Liberar holds vencidos: endpoint para cron + intervalo en proceso.
-  function resolveGoogle(businessId: string) {
-    const business = store.getBusiness(businessId);
+  async function resolveGoogle(businessId: string) {
+    const business = await store.getBusiness(businessId);
     return business?.googleAccessToken && business.calendarId
       ? { accessToken: business.googleAccessToken, calendarId: business.calendarId }
       : null;

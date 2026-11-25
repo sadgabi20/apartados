@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@apartados/db": "workspace:*",
     "@apartados/google-calendar": "workspace:*",
     "@apartados/pey": "workspace:*",
     "@apartados/shared": "workspace:*",
