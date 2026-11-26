@@ -1,3 +1,7 @@
+<picture>
+    <img src="assets/header.png" alt="Apartados: El anticipo que confirma la cita">
+</picture>
+
 # Apartados
 
 **El anticipo que confirma la cita.**
