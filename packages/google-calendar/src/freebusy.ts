@@ -15,24 +15,30 @@ interface FreeBusyResponse {
   >;
 }
 
+import { googleApiBaseUrl, timedFetch } from "./timeout";
+
 export async function getFreeBusy(
   accessToken: string,
   calendarId: string,
   timeMin: string,
   timeMax: string,
 ): Promise<BusyInterval[]> {
-  const res = await fetch("https://www.googleapis.com/calendar/v3/freeBusy", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
+  const res = await timedFetch(
+    `${googleApiBaseUrl()}/calendar/v3/freeBusy`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        timeMin,
+        timeMax,
+        items: [{ id: calendarId }],
+      }),
     },
-    body: JSON.stringify({
-      timeMin,
-      timeMax,
-      items: [{ id: calendarId }],
-    }),
-  });
+    "freeBusy",
+  );
   if (!res.ok) {
     throw new Error(`Google freeBusy failed: ${res.status} ${await res.text()}`);
   }

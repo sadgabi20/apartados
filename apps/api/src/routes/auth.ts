@@ -4,6 +4,7 @@
 // eso es Fase 2, con su propio flujo y redirect).
 // Sesión opaca en DB + cookie httpOnly, sin JWT (ver services/session.ts).
 import { OAuth2Client } from "google-auth-library";
+import { googleOAuthBaseUrl, timedFetch } from "@apartados/google-calendar";
 import type { FastifyInstance } from "fastify";
 import type { AppointmentStore } from "../store";
 import { requireAuth } from "../middleware/auth";
@@ -101,17 +102,30 @@ export function authRoutes(app: FastifyInstance, store: AppointmentStore) {
     const clearState = clearOAuthStateCookieHeader();
 
     // Intercambio code → tokens (id_token incluido por el scope openid).
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        redirect_uri: config.redirectUri,
-        grant_type: "authorization_code",
-      }),
-    });
+    // Con timeout acotado (ver packages/google-calendar/src/timeout.ts):
+    // sin él, un Google colgado deja colgado el callback de login.
+    let tokenRes: Response;
+    try {
+      tokenRes = await timedFetch(
+        `${googleOAuthBaseUrl()}/token`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            code,
+            client_id: config.clientId,
+            client_secret: config.clientSecret,
+            redirect_uri: config.redirectUri,
+            grant_type: "authorization_code",
+          }),
+        },
+        "OAuth",
+      );
+    } catch (err) {
+      req.log.error({ err }, "Google token exchange failed");
+      reply.header("Set-Cookie", clearState);
+      return reply.redirect(`${config.webUrl}/login?error=google`);
+    }
     if (!tokenRes.ok) {
       req.log.error({ status: tokenRes.status }, "Google token exchange failed");
       reply.header("Set-Cookie", clearState);

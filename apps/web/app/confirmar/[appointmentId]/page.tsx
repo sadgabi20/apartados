@@ -10,6 +10,13 @@ import { useParams } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
+// Guard client-side para el QR: la API acota la creación del QR a
+// PEY_TIMEOUT_MS (240 s por defecto), así que el error acotado de la API
+// llega primero en el caso normal. Este guard es un poco mayor (270 s)
+// y solo rescata la UI si la API misma se cuelga: sin él, el botón se
+// quedaría en "Generando QR…" para siempre.
+const WEB_QR_TIMEOUT_MS = 270_000;
+
 interface Appointment {
   id: string;
   status: string;
@@ -77,22 +84,36 @@ export default function ConfirmPage() {
     if (!appointment) return;
     setError("");
     setLoading(true);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), WEB_QR_TIMEOUT_MS);
     try {
       const res = await fetch(`${API}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appointmentId: appointment.id }),
+        signal: controller.signal,
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "No se pudo generar el QR.");
+        setError(
+          typeof data.error === "string"
+            ? data.error
+            : "No se pudo generar el QR.",
+        );
         return;
       }
       setAppointment(data.appointment);
       setQrPayload(data.qrPayload ?? JSON.stringify(data.qr));
-    } catch {
-      setError("No se pudo contactar a la API (¿corre en :3001?)");
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        setError(
+          "La generación del QR tardó demasiado. Tu cita sigue apartada, inténtalo de nuevo.",
+        );
+      } else {
+        setError("No se pudo contactar a la API (¿corre en :3001?)");
+      }
     } finally {
+      clearTimeout(timer);
       setLoading(false);
     }
   }
@@ -141,9 +162,17 @@ export default function ConfirmPage() {
         Anticipo: ${appointment.depositAmount} MXN
       </p>
       {appointment.status === "hold" && !expired && !qrPayload && (
-        <button onClick={pay} disabled={loading}>
-          {loading ? "Generando QR…" : "Confirmar y pagar"}
-        </button>
+        <>
+          <button onClick={pay} disabled={loading}>
+            {loading ? "Generando QR…" : "Confirmar y pagar"}
+          </button>
+          {loading && (
+            <p>
+              Tu hora sigue apartada mientras se genera el QR. Puede tardar
+              unos minutos, no cierres la página.
+            </p>
+          )}
+        </>
       )}
       {error && <p style={{ color: "red" }}>{error}</p>}
       {appointment.status === "hold" && !expired && qrPayload && (
