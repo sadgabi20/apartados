@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import QrCodeImage from "../../../components/qr-code";
+import { apiErrorMessage } from "../../../lib/api-error";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -62,7 +63,7 @@ export default function BookingPage() {
       .then((r) => r.json())
       .then((d) => {
         if (d.business) setBusiness(d.business);
-        if (d.error) setError(d.error);
+        if (d.error) setError(apiErrorMessage(d, "No se pudo cargar el negocio."));
       })
       .catch(() => setError("No se pudo contactar a la API (¿corre en :3001?)"));
   }, [slug]);
@@ -75,7 +76,7 @@ export default function BookingPage() {
         setService(d.service ?? null);
         setSlots(d.slots ?? []);
         setGoogle(d.google ?? "");
-        if (d.error) setError(d.error);
+        if (d.error) setError(apiErrorMessage(d, "No se pudo cargar la disponibilidad."));
       })
       .catch(() => setError("No se pudo contactar a la API (¿corre en :3001?)"));
   }, [date, slug, business]);
@@ -115,11 +116,7 @@ export default function BookingPage() {
       });
       const pData = await pRes.json();
       if (!pRes.ok) {
-        setError(
-          typeof pData.error === "string"
-            ? pData.error
-            : "No se pudo generar el QR.",
-        );
+        setError(apiErrorMessage(pData, "No se pudo generar el QR."));
         return;
       }
       setAppointment(pData.appointment);
@@ -159,7 +156,7 @@ export default function BookingPage() {
     });
     const bData = await bRes.json();
     if (!bRes.ok) {
-      setError(bData.error ?? "No se pudo apartar la hora.");
+      setError(apiErrorMessage(bData, "No se pudo apartar la hora."));
       return;
     }
     // La hora ya está apartada: guardarla ANTES de pedir el QR para que

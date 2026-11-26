@@ -9,6 +9,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { apiErrorMessage } from "../../lib/api-error";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -125,11 +126,7 @@ function OnboardingContent() {
         router.replace("/login?next=/onboarding");
         return;
       }
-      setError(
-        typeof data.error === "string"
-          ? data.error
-          : "No se pudo crear el negocio, revisa los datos.",
-      );
+      setError(apiErrorMessage(data, "No se pudo crear el negocio, revisa los datos."));
       return;
     }
     setCreated(data.business);

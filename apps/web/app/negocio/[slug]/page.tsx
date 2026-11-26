@@ -11,6 +11,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import OwnerNav from "../../../components/owner-nav";
+import { apiErrorMessage } from "../../../lib/api-error";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -77,7 +78,7 @@ function BusinessPageContent() {
       .then((r) => r.json())
       .then((d) => {
         if (d.business) setBusiness(d.business);
-        if (d.error) setError(d.error);
+        if (d.error) setError(apiErrorMessage(d, "No se pudo cargar el negocio."));
       })
       .catch(() => setError("No se pudo contactar a la API (¿corre en :3001?)"));
   }, [slug]);
@@ -96,7 +97,7 @@ function BusinessPageContent() {
         // "Conectado ✓" de /auth/me ya no es verdad: se muestra el link
         // para reconectar en vez de dejar el error genérico.
         if (d.code === "google_auth_expired") setCalendarConnected(false);
-        if (d.error) setError(d.error);
+        if (d.error) setError(apiErrorMessage(d, "No se pudo cargar la disponibilidad."));
       })
       .catch(() => setError("No se pudo contactar a la API (¿corre en :3001?)"));
   }, [date, slug, business]);
@@ -119,7 +120,7 @@ function BusinessPageContent() {
         setError("Este negocio pertenece a otra cuenta. ¿Entraste con el Google correcto?");
         return;
       }
-      setError(data.error ?? "No se pudo cambiar la visibilidad.");
+      setError(apiErrorMessage(data, "No se pudo cambiar la visibilidad."));
       return;
     }
     setBusiness(data.business);
@@ -147,7 +148,7 @@ function BusinessPageContent() {
     });
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error ?? "No se pudo apartar la hora.");
+      setError(apiErrorMessage(data, "No se pudo apartar la hora."));
       return;
     }
     setAppointment(data.appointment);
