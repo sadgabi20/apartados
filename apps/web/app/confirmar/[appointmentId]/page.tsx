@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import QrCodeImage from "../../../components/qr-code";
+import { apiErrorMessage } from "../../../lib/api-error";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -56,7 +57,7 @@ export default function ConfirmPage() {
     const data = await res.json();
     if (!res.ok) {
       setNotFound(true);
-      setError(data.error ?? "Cita no encontrada");
+      setError(apiErrorMessage(data, "Cita no encontrada"));
       return;
     }
     setAppointment(data.appointment);
@@ -99,11 +100,7 @@ export default function ConfirmPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(
-          typeof data.error === "string"
-            ? data.error
-            : "No se pudo generar el QR.",
-        );
+        setError(apiErrorMessage(data, "No se pudo generar el QR."));
         return;
       }
       setAppointment(data.appointment);
