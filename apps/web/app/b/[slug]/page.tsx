@@ -3,12 +3,15 @@
 // Si la agenda es privada, no muestra disponibilidad ni formulario:
 // solo el negocio puede apartar huecos (desde /negocio/[slug]) y mandar
 // el link de confirmación. Nota: la forma exacta de la respuesta del QR
-// de Pey no está documentada en docs.pey.mx; la página muestra el campo
-// que traiga (qr / qrText / image / url) y, si no hay ninguno, el JSON.
+// de Pey no está documentada en docs.pey.mx; la API extrae el payload
+// (qr / qrText / image / url) y la página lo muestra como imagen
+// escaneable (components/qr-code.tsx). Si Pey no trae ningún campo
+// conocido, no se inventa un QR: se muestra el error y se reintenta.
 "use client";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import QrCodeImage from "../../../components/qr-code";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -121,7 +124,14 @@ export default function BookingPage() {
       }
       setAppointment(pData.appointment);
       setStatus("hold");
-      setQrPayload(pData.qrPayload ?? JSON.stringify(pData.qr));
+      // Si Pey no devolvió un payload legible, no se inventa un QR con el
+      // JSON crudo (un banco no lo podría cobrar): se muestra el error y
+      // queda el botón de reintento.
+      if (typeof pData.qrPayload === "string" && pData.qrPayload.length > 0) {
+        setQrPayload(pData.qrPayload);
+      } else {
+        setError("Pey no devolvió un QR legible. Inténtalo de nuevo.");
+      }
     } catch {
       setError("No se pudo contactar a la API (¿corre en :3001?)");
     } finally {
@@ -223,12 +233,7 @@ export default function BookingPage() {
           )}
           {status === "hold" && qrPayload && (
             <>
-              {qrPayload.startsWith("http") || qrPayload.startsWith("data:image") ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={qrPayload} alt="QR CoDi para pagar el anticipo" width={240} />
-              ) : (
-                <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{qrPayload}</pre>
-              )}
+              <QrCodeImage payload={qrPayload} />
               <p>Escanea el QR con tu app bancaria (CoDi). Tienes 10 minutos.</p>
             </>
           )}

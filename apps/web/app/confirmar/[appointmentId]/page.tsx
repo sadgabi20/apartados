@@ -3,10 +3,14 @@
 // La web NUNCA toca Pey ni Google directo: solo llama a apps/api.
 // El QR se genera bajo demanda al tocar "Confirmar y pagar" (el QR de
 // Pey expira en 600 s, así no se gasta mientras el link está en WhatsApp).
+// El payload se muestra como imagen escaneable (components/qr-code.tsx);
+// si Pey no trae un campo conocido, no se inventa un QR con el JSON: se
+// muestra el error y se reintenta.
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import QrCodeImage from "../../../components/qr-code";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -103,7 +107,14 @@ export default function ConfirmPage() {
         return;
       }
       setAppointment(data.appointment);
-      setQrPayload(data.qrPayload ?? JSON.stringify(data.qr));
+      // Si Pey no devolvió un payload legible, no se inventa un QR con el
+      // JSON crudo (un banco no lo podría cobrar): se muestra el error y
+      // queda el botón para reintentar.
+      if (typeof data.qrPayload === "string" && data.qrPayload.length > 0) {
+        setQrPayload(data.qrPayload);
+      } else {
+        setError("Pey no devolvió un QR legible. Inténtalo de nuevo.");
+      }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         setError(
@@ -178,12 +189,7 @@ export default function ConfirmPage() {
       {appointment.status === "hold" && !expired && qrPayload && (
         <section>
           <h2>Paga tu anticipo</h2>
-          {qrPayload.startsWith("http") || qrPayload.startsWith("data:image") ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={qrPayload} alt="QR CoDi para pagar el anticipo" width={240} />
-          ) : (
-            <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{qrPayload}</pre>
-          )}
+          <QrCodeImage payload={qrPayload} />
           <p>Escanea el QR con tu app bancaria (CoDi). Tienes 10 minutos para pagar este QR.</p>
         </section>
       )}
