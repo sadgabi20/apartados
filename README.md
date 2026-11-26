@@ -40,7 +40,7 @@ Monorepo con Turborepo + pnpm + TypeScript:
 - `packages/pey` — Cliente de Pey / CoDi.
 - `packages/google-calendar` — Cliente de Google Calendar.
 - `packages/db` — Prisma + Postgres.
-- `packages/shared`, `packages/ui`, `packages/config` — Tipos, componentes y configuración compartida.
+- `packages/shared`, `packages/ui`, `packages/config` — Tipos, componentes y configuración compartidas.
 
 La web nunca habla directo con Pey ni con Google: solo llama a la API, que es la única que crea la cita, genera el QR y confirma el pago.
 
