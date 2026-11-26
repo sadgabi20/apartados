@@ -12,6 +12,7 @@ import { createMemoryStore } from "./store";
 import type { AppointmentStore } from "./store";
 import { authRoutes } from "./routes/auth";
 import { availabilityRoutes } from "./routes/availability";
+import { bankAccountRoutes } from "./routes/bank-accounts";
 import { bookingRoutes } from "./routes/bookings";
 import { businessRoutes } from "./routes/businesses";
 import { paymentRoutes } from "./routes/payments";
@@ -75,6 +76,7 @@ async function main() {
   app.get("/health", async () => ({ ok: true }));
   authRoutes(app, store);
   availabilityRoutes(app, store);
+  bankAccountRoutes(app, store);
   bookingRoutes(app, store);
   businessRoutes(app, store);
   paymentRoutes(app, store);

@@ -35,6 +35,7 @@ import type {
   PrismaAppointment,
   PrismaBusiness,
   PrismaGoogleAccount,
+  PrismaPeyBankAccount,
   PrismaService,
   PrismaSession,
   PrismaUser,
@@ -46,6 +47,8 @@ import type {
   AppointmentStatus,
   AppointmentStore,
   BusinessRecord,
+  PeyBankAccountRecord,
+  PeyBankAccountStatus,
   ServiceRecord,
   SessionRecord,
   UserRecord,
@@ -84,6 +87,21 @@ function toServiceRecord(s: PrismaService): ServiceRecord {
     name: s.name,
     durationMin: s.durationMin,
     depositAmount: s.depositAmount,
+  };
+}
+
+function toPeyBankAccountRecord(a: PrismaPeyBankAccount): PeyBankAccountRecord {
+  return {
+    id: a.id,
+    businessId: a.businessId,
+    peyBankAccountId: a.peyBankAccountId,
+    alias: a.alias,
+    status: a.status as PeyBankAccountStatus,
+    holderName: a.holderName,
+    clabeLast4: a.clabeLast4,
+    errorMessage: a.errorMessage,
+    createdAt: a.createdAt.toISOString(),
+    updatedAt: a.updatedAt.toISOString(),
   };
 }
 
@@ -235,6 +253,36 @@ export async function createPrismaStore(prisma: PrismaClient): Promise<Appointme
         include: BUSINESS_INCLUDE,
       });
       return b ? toBusinessRecord(b) : undefined;
+    },
+    getBankAccount: async (businessId) => {
+      const a = await prisma.peyBankAccount.findUnique({ where: { businessId } });
+      return a ? toPeyBankAccountRecord(a) : undefined;
+    },
+    saveBankAccount: async (a) => {
+      // Upsert por businessId (1:1): re-registrar reemplaza la cuenta
+      // anterior. El id interno se conserva si ya existía una.
+      const saved = await prisma.peyBankAccount.upsert({
+        where: { businessId: a.businessId },
+        create: {
+          ...(a.id ? { id: a.id } : {}),
+          businessId: a.businessId,
+          peyBankAccountId: a.peyBankAccountId,
+          alias: a.alias,
+          status: a.status,
+          holderName: a.holderName,
+          clabeLast4: a.clabeLast4,
+          errorMessage: a.errorMessage,
+        },
+        update: {
+          peyBankAccountId: a.peyBankAccountId,
+          alias: a.alias,
+          status: a.status,
+          holderName: a.holderName,
+          clabeLast4: a.clabeLast4,
+          errorMessage: a.errorMessage,
+        },
+      });
+      return toPeyBankAccountRecord(saved);
     },
     saveBusiness: async (b) => {
       await prisma.business.update({

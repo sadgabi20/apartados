@@ -184,13 +184,30 @@ export function authRoutes(app: FastifyInstance, store: AppointmentStore) {
   // GET /auth/me — quién soy + mis negocios. 401 sin sesión.
   app.get("/auth/me", { preHandler: requireAuth(store) }, async (req) => {
     const user = req.user!;
-    const businesses = (await store.listBusinessesByOwner(user.id)).map((b) => ({
-      id: b.id,
-      slug: b.slug,
-      name: b.name,
-      agendaVisibility: b.agendaVisibility,
-      calendarConnected: !!b.googleAccessToken && !!b.calendarId,
-    }));
+    const businesses = await Promise.all(
+      (await store.listBusinessesByOwner(user.id)).map(async (b) => {
+        // Estado de la cuenta de pagos (CoDi): "none" = sin conectar (los
+        // anticipos caen en la cuenta de Apartados), "pending" = en
+        // validación con Banxico, "active" = recibe directo, "error" =
+        // registro rechazado. El dashboard lo muestra sin otro fetch.
+        const bankAccount = await store.getBankAccount(b.id);
+        const paymentAccountStatus = !bankAccount
+          ? "none"
+          : bankAccount.status === "ACTIVE"
+            ? "active"
+            : bankAccount.status === "ERROR"
+              ? "error"
+              : "pending";
+        return {
+          id: b.id,
+          slug: b.slug,
+          name: b.name,
+          agendaVisibility: b.agendaVisibility,
+          calendarConnected: !!b.googleAccessToken && !!b.calendarId,
+          paymentAccountStatus,
+        };
+      }),
+    );
     return {
       // googleSub solo lo ve el propio dueño de la sesión: es su
       // identificador estable de Google y lo necesita para ponerlo en

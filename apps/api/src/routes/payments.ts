@@ -40,9 +40,19 @@ export function paymentRoutes(app: FastifyInstance, store: AppointmentStore) {
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
+    // Cuenta de pagos del negocio (CoDi): si tiene una cuenta ACTIVE, el
+    // QR se crea con su bankAccountId y el anticipo cae directo en su
+    // cuenta, sin pasar por Apartados. Sin cuenta (o en validación), el
+    // QR se crea como hoy —con la cuenta ligada a la API key— y la
+    // respuesta lo marca como pendiente para que el dashboard avise.
+    const bankAccount = await store.getBankAccount(appointment.businessId);
+    const bankAccountActive = bankAccount?.status === "ACTIVE";
     let qr;
     try {
-      qr = await createPeyQr(parsed.data);
+      qr = await createPeyQr({
+        ...parsed.data,
+        ...(bankAccountActive ? { bankAccountId: bankAccount.peyBankAccountId } : {}),
+      });
     } catch (err) {
       req.log.error(err);
       // ¿La hora se liberó mientras Pey tardaba? Entonces el error no es
@@ -87,6 +97,9 @@ export function paymentRoutes(app: FastifyInstance, store: AppointmentStore) {
       appointment: updated,
       qr,
       qrPayload: extractQrPayload(qr),
+      // "active" = el anticipo cae en la cuenta del negocio; "pending" =
+      // cae en la cuenta de Apartados hasta que el negocio conecte su CLABE.
+      bankAccountStatus: bankAccountActive ? "active" : "pending",
     });
   });
 }
