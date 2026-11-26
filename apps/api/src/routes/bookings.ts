@@ -9,7 +9,9 @@
 // devuelve también negocio y servicio para la página de confirmación.
 import type { FastifyInstance } from "fastify";
 import { createAppointmentSchema } from "@apartados/shared";
+import { GoogleAuthExpiredError } from "@apartados/google-calendar";
 import { createHold } from "../services/hold";
+import { googleCtxForBusiness } from "../services/google-auth";
 import { isOriginAllowed, resolveOptionalAuth } from "../middleware/auth";
 import type { AppointmentStore } from "../store";
 
@@ -46,10 +48,7 @@ export function bookingRoutes(app: FastifyInstance, store: AppointmentStore) {
         visibility: "private",
       });
     }
-    const google =
-      business.googleAccessToken && business.calendarId
-        ? { accessToken: business.googleAccessToken, calendarId: business.calendarId }
-        : null;
+    const google = googleCtxForBusiness(store, business);
     try {
       const appointment = await createHold({
         store,
@@ -68,6 +67,13 @@ export function bookingRoutes(app: FastifyInstance, store: AppointmentStore) {
     } catch (err) {
       if ((err as Error).message === "SLOT_TAKEN") {
         return reply.status(409).send({ error: "Esa hora ya está ocupada, elige otra" });
+      }
+      if (err instanceof GoogleAuthExpiredError) {
+        return reply.status(503).send({
+          error:
+            "El calendario del negocio necesita reconectarse: el acceso de Google caducó. Pídele al negocio que vuelva a conectar su Google Calendar.",
+          code: "google_auth_expired",
+        });
       }
       throw err;
     }

@@ -18,6 +18,7 @@ import { paymentRoutes } from "./routes/payments";
 import { peyWebhookRoutes } from "./routes/webhooks/pey";
 import { googleRoutes } from "./routes/google";
 import { releaseExpiredHolds } from "./services/release-expired";
+import { googleCtxForBusiness } from "./services/google-auth";
 
 const app = Fastify({ logger: true });
 
@@ -83,9 +84,7 @@ async function main() {
   // Liberar holds vencidos: endpoint para cron + intervalo en proceso.
   async function resolveGoogle(businessId: string) {
     const business = await store.getBusiness(businessId);
-    return business?.googleAccessToken && business.calendarId
-      ? { accessToken: business.googleAccessToken, calendarId: business.calendarId }
-      : null;
+    return business ? googleCtxForBusiness(store, business) : null;
   }
   app.post("/release-expired", async () => {
     const released = await releaseExpiredHolds({ store, resolveGoogle });

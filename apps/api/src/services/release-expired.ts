@@ -19,7 +19,12 @@ export async function releaseExpiredHolds(input: {
     const google = await input.resolveGoogle(appt.businessId);
     if (google && appt.googleEventId) {
       try {
-        await deleteEvent(google.accessToken, google.calendarId, appt.googleEventId);
+        await deleteEvent(
+          google.accessToken,
+          google.calendarId,
+          appt.googleEventId,
+          { refreshAccessToken: google.refreshAccessToken },
+        );
       } catch {
         // Si el evento ya no existe en Google, igual liberamos la cita.
       }

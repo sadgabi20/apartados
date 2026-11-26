@@ -27,6 +27,7 @@ export async function confirmAppointment(input: {
         customerName: appointment.customerName,
         depositAmount: appointment.depositAmount,
       },
+      { refreshAccessToken: input.google.refreshAccessToken },
     );
   }
   const updated = await store.updateAppointment(appointment.id, {

@@ -25,13 +25,11 @@ import {
 } from "../services/oauth-state";
 import { parseCookies } from "../services/session";
 import { encryptRefreshToken } from "../services/token-crypto";
+import { googleOAuthConfig } from "../services/google-auth";
 
 function oauthConfig() {
   return {
-    clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-    redirectUri:
-      process.env.GOOGLE_REDIRECT_URI ?? "http://localhost:3001/google/callback",
+    ...googleOAuthConfig(),
     webUrl: process.env.WEB_URL ?? "",
   };
 }
