@@ -92,6 +92,10 @@ function BusinessPageContent() {
       .then((d) => {
         setService(d.service ?? null);
         setSlots(d.slots ?? []);
+        // Si el token de Google caducó y el refresh no lo renovó, el
+        // "Conectado ✓" de /auth/me ya no es verdad: se muestra el link
+        // para reconectar en vez de dejar el error genérico.
+        if (d.code === "google_auth_expired") setCalendarConnected(false);
         if (d.error) setError(d.error);
       })
       .catch(() => setError("No se pudo contactar a la API (¿corre en :3001?)"));

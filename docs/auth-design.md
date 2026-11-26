@@ -1,6 +1,6 @@
 # Diseño de auth — Apartados
 
-> Estado: diseño. Fase 1 implementada y mergeada (PR #3). Fase 2 implementada y mergeada (PR #5). Fase 3 implementada y mergeada (PR #7). Persistencia en Supabase/Postgres con Prisma: PR `feat/supabase-persistencia`. Fecha: 2026-11-24.
+> Estado: diseño. Fase 1 implementada y mergeada (PR #3). Fase 2 implementada y mergeada (PR #5). Fase 3 implementada y mergeada (PR #7). Persistencia en Supabase/Postgres con Prisma: PR #8 (mergeado). Refresh automático del access token de Google: PR `feat/google-token-refresh` (2026-11-25). Fecha: 2026-11-24.
 > Contexto: PR #2 (agenda pública/privada + flujo manual por WhatsApp) ya está
 > mergeado. Hoy no existe auth de ningún tipo: `PATCH /businesses/:slug` y
 > `POST /bookings` con `source='business'` los puede llamar cualquiera, y las
@@ -449,6 +449,20 @@ de producción).
   prueba; conectar calendario y ver evento en Google; un dueño B no puede
   apartar ni cambiar la agenda del negocio de A (403 en API y en web); la
   agenda privada sigue bloqueando al cliente sin sesión.
+- **Refresh automático del `access_token` (PR `feat/google-token-refresh`,
+  2026-11-25):** el `access_token` dura 1 hora y antes nadie lo renovaba:
+  a la hora, cada llamada a Google daba 401 y la API contestaba 500. Ahora
+  cada llamada a Google (`freeBusy`, eventos) reintenta una sola vez con
+  un token nuevo pedido con el `refresh_token` descifrado
+  (`services/google-auth.ts`, `makeRefreshAccessToken`); el token nuevo
+  (y el refresh nuevo si Google rota uno) se persiste con `saveBusiness`.
+  Si el refresh falla (revocado o caducado — en modo Testing, los refresh
+  tokens caducan a los 7 días), la API contesta 503 `google_auth_expired`
+  y la web muestra que el calendario necesita reconectarse, en vez de un
+  500 genérico. El webhook de Pey pagado confirma la cita en base de datos
+  aunque el calendario no se pueda actualizar, para no dejar sin cita a
+  un cliente que ya pagó. Pendiente: `GET /auth/me` sigue reportando
+  `calendarConnected` por credenciales guardadas, no por token vigente.
 
 ### Fase 3 — Migración de `barberia-demo` a un dueño real
 

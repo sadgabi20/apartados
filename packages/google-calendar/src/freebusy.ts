@@ -16,42 +16,47 @@ interface FreeBusyResponse {
 }
 
 import { googleApiBaseUrl, timedFetch } from "./timeout";
+import { GoogleApiError } from "./errors";
+import { withGoogleAuthRetry, type RefreshAccessToken } from "./auth-retry";
 
 export async function getFreeBusy(
   accessToken: string,
   calendarId: string,
   timeMin: string,
   timeMax: string,
+  opts?: { refreshAccessToken?: RefreshAccessToken },
 ): Promise<BusyInterval[]> {
-  const res = await timedFetch(
-    `${googleApiBaseUrl()}/calendar/v3/freeBusy`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
+  return withGoogleAuthRetry(accessToken, opts?.refreshAccessToken, async (token) => {
+    const res = await timedFetch(
+      `${googleApiBaseUrl()}/calendar/v3/freeBusy`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          timeMin,
+          timeMax,
+          items: [{ id: calendarId }],
+        }),
       },
-      body: JSON.stringify({
-        timeMin,
-        timeMax,
-        items: [{ id: calendarId }],
-      }),
-    },
-    "freeBusy",
-  );
-  if (!res.ok) {
-    throw new Error(`Google freeBusy failed: ${res.status} ${await res.text()}`);
-  }
-  const data = (await res.json()) as FreeBusyResponse;
-  const calendar = data.calendars?.[calendarId];
-  if (!calendar) throw new Error(`freeBusy sin datos para ${calendarId}`);
-  if (calendar.errors?.length) {
-    // Fallar cerrado: un calendario con error no se muestra como libre.
-    throw new Error(
-      `freeBusy error en ${calendarId}: ${calendar.errors.map((e) => e.reason).join(", ")}`,
+      "freeBusy",
     );
-  }
-  return calendar.busy ?? [];
+    if (!res.ok) {
+      throw new GoogleApiError(res.status, `Google freeBusy failed: ${res.status} ${await res.text()}`);
+    }
+    const data = (await res.json()) as FreeBusyResponse;
+    const calendar = data.calendars?.[calendarId];
+    if (!calendar) throw new Error(`freeBusy sin datos para ${calendarId}`);
+    if (calendar.errors?.length) {
+      // Fallar cerrado: un calendario con error no se muestra como libre.
+      throw new Error(
+        `freeBusy error en ${calendarId}: ${calendar.errors.map((e) => e.reason).join(", ")}`,
+      );
+    }
+    return calendar.busy ?? [];
+  });
 }
 
 export function overlaps(

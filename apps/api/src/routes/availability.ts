@@ -7,8 +7,9 @@
 // podía pasarlo y saltarse la agenda privada; ahora lo decide la sesión
 // y el param se ignora.
 import type { FastifyInstance } from "fastify";
-import { getFreeBusy, overlaps } from "@apartados/google-calendar";
+import { getFreeBusy, GoogleAuthExpiredError, overlaps } from "@apartados/google-calendar";
 import { resolveOptionalAuth } from "../middleware/auth";
+import { makeRefreshAccessToken } from "../services/google-auth";
 import type { AppointmentStore } from "../store";
 
 export function availabilityRoutes(app: FastifyInstance, store: AppointmentStore) {
@@ -48,12 +49,29 @@ export function availabilityRoutes(app: FastifyInstance, store: AppointmentStore
         slots,
       };
     }
-    const busy = await getFreeBusy(
-      business.googleAccessToken,
-      business.calendarId,
-      `${date}T00:00:00-06:00`,
-      `${date}T23:59:59-06:00`,
-    );
+    let busy;
+    try {
+      busy = await getFreeBusy(
+        business.googleAccessToken,
+        business.calendarId,
+        `${date}T00:00:00-06:00`,
+        `${date}T23:59:59-06:00`,
+        { refreshAccessToken: makeRefreshAccessToken(store, business.id) },
+      );
+    } catch (err) {
+      // El access token caducó y el refresh no pudo renovarlo: error
+      // claro de reconexión (503), no un 500 genérico. La web lo
+      // muestra tal cual en vez de "Internal Server Error".
+      if (err instanceof GoogleAuthExpiredError) {
+        return reply.status(503).send({
+          error:
+            "El calendario del negocio necesita reconectarse: el acceso de Google caducó. Pídele al negocio que vuelva a conectar su Google Calendar.",
+          code: "google_auth_expired",
+          google: "auth-expired",
+        });
+      }
+      throw err;
+    }
     const free = slots.filter((start) => {
       const end = new Date(new Date(start).getTime() + service.durationMin * 60_000).toISOString();
       return !overlaps(busy, start, end);

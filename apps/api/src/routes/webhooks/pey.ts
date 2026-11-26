@@ -5,8 +5,10 @@
 // el JSON re-serializado, o la firma no cuadra.
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { verifyPeyWebhookSignature } from "@apartados/pey";
+import { GoogleAuthExpiredError } from "@apartados/google-calendar";
 import { peyWebhookSchema } from "@apartados/shared";
 import { confirmAppointment } from "../../services/confirm";
+import { googleCtxForBusiness } from "../../services/google-auth";
 import type { AppointmentStore } from "../../store";
 
 type RawBodyRequest = FastifyRequest & { rawBody?: string };
@@ -49,17 +51,32 @@ export function peyWebhookRoutes(app: FastifyInstance, store: AppointmentStore) 
     }
     const business = await store.getBusiness(appointment.businessId);
     const service = await store.getService(appointment.serviceId);
-    const google =
-      business?.googleAccessToken && business.calendarId
-        ? { accessToken: business.googleAccessToken, calendarId: business.calendarId }
-        : null;
-    const confirmed = await confirmAppointment({
-      store,
-      google,
-      appointment,
-      serviceName: service?.name ?? "Servicio",
-      transactionId: event.transactionId ?? "",
-    });
+    const google = business ? googleCtxForBusiness(store, business) : null;
+    let confirmed;
+    try {
+      confirmed = await confirmAppointment({
+        store,
+        google,
+        appointment,
+        serviceName: service?.name ?? "Servicio",
+        transactionId: event.transactionId ?? "",
+      });
+    } catch (err) {
+      // El pago YA entró: si el calendario no se pudo renovar, la cita
+      // se confirma igual en base de datos (el evento queda en espera
+      // en Google y el hueco sigue bloqueado por él). No se contesta
+      // 500: Pey reintentaría el webhook y fallaría igual hasta agotar
+      // sus reintentos, y el cliente pagado se quedaría sin cita.
+      if (!(err instanceof GoogleAuthExpiredError)) throw err;
+      app.log.warn(
+        `Webhook Pey ${event.transactionId}: pago registrado pero el calendario no se pudo actualizar (token caducado, negocio ${business?.slug} debe reconectar)`,
+      );
+      confirmed = await store.updateAppointment(appointment.id, {
+        status: "confirmed",
+        transactionId: event.transactionId ?? "",
+      });
+      return { ok: true, appointment: confirmed, calendar: "auth-expired" };
+    }
     return { ok: true, appointment: confirmed };
   });
 }

@@ -7,12 +7,15 @@
 // Si Google aún no está conectado (google = null), la cita se aparta
 // solo en base de datos y googleEventId queda null: así el sábado puede
 // avanzar el flujo de Pey aunque el OAuth de Google se atore.
-import { getFreeBusy, overlaps, createHoldEvent } from "@apartados/google-calendar";
+import { getFreeBusy, overlaps, createHoldEvent, type RefreshAccessToken } from "@apartados/google-calendar";
 import type { AppointmentRecord, AppointmentStore } from "../store";
 
 export interface GoogleCtx {
   accessToken: string;
   calendarId: string;
+  // Renovar el access token si una llamada da 401 (dura 1 hora).
+  // Lo construye googleCtxForBusiness (services/google-auth.ts).
+  refreshAccessToken?: RefreshAccessToken;
 }
 
 export async function createHold(input: {
@@ -42,6 +45,7 @@ export async function createHold(input: {
       input.google.calendarId,
       startAt,
       endAt,
+      { refreshAccessToken: input.google.refreshAccessToken },
     );
     if (overlaps(busy, startAt, endAt)) {
       throw new Error("SLOT_TAKEN");
@@ -56,6 +60,7 @@ export async function createHold(input: {
         customerName: input.customerName,
         customerPhone: input.customerPhone,
       },
+      { refreshAccessToken: input.google.refreshAccessToken },
     );
   }
 
