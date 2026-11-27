@@ -10,6 +10,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import BankAccountSection from "../../../components/bank-account-section";
 import OwnerNav from "../../../components/owner-nav";
 import { apiErrorMessage } from "../../../lib/api-error";
 
@@ -197,6 +198,12 @@ function BusinessPageContent() {
               <a href={`${API}/google/auth?slug=${slug}`}>Conectar Google Calendar</a>
             )}
           </p>
+        </section>
+      )}
+      {business && (
+        <section>
+          <h2>Cuenta de pagos</h2>
+          <BankAccountSection slug={slug} />
         </section>
       )}
       <section>

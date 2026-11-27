@@ -58,6 +58,9 @@ model Business {
   services  Service[]
   appointments Appointment[]
   googleAccount GoogleAccount?
+  // Cuenta de pagos Pey (CoDi): 1:1, opcional. La CLABE completa NUNCA
+  // se guarda: solo el id de Pey + los últimos 4 dígitos (ver modelo).
+  bankAccount PeyBankAccount?
   createdAt DateTime      @default(now())
 
   @@index([ownerId])
@@ -119,4 +122,27 @@ model GoogleAccount {
   // cifrado es texto: el cifrado es a nivel aplicación, sin migración.
   refreshToken String?
   createdAt    DateTime @default(now())
+}
+
+// Cuenta de pagos del negocio en Pey (CoDi). Una por negocio.
+// La CLABE completa NUNCA se guarda en Apartados: se manda una vez a
+// Pey (POST /bank-account) y solo se conserva el id que devuelve Pey
+// (ULID) + los últimos 4 dígitos para mostrar. El dinero del anticipo
+// cae directo en esa cuenta (POST /codi/qr con bankAccountId), sin
+// pasar por Apartados. Solo las cuentas ACTIVE pueden recibir pagos;
+// PENDING/PROCESSING = en validación con Banxico, ERROR = registro
+// rechazado (ver errorMessage). El estado se refresca al leer
+// (GET /businesses/:slug/bank-account consulta a Pey si no está final).
+model PeyBankAccount {
+  id               String   @id @default(cuid())
+  businessId       String   @unique
+  business         Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  peyBankAccountId String   @unique // ULID que devuelve Pey al registrar
+  alias            String
+  status           String   // PENDING | PROCESSING | ACTIVE | ERROR (codiStatus de Pey)
+  holderName       String   // nombre legal del titular (campo "name" de Pey)
+  clabeLast4       String   // últimos 4 dígitos de la CLABE, solo para mostrar
+  errorMessage     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }

@@ -84,10 +84,34 @@ export interface AppointmentRecord {
   createdAt: string;
 }
 
+// Cuenta de pagos del negocio en Pey (CoDi). Una por negocio.
+// La CLABE completa NUNCA se guarda en Apartados: se manda una vez a
+// Pey y solo se conservan el id de Pey + los últimos 4 dígitos.
+// Solo las cuentas ACTIVE pueden recibir pagos (el QR se crea con su
+// bankAccountId); PENDING/PROCESSING = en validación con Banxico.
+export type PeyBankAccountStatus = "PENDING" | "PROCESSING" | "ACTIVE" | "ERROR";
+
+export interface PeyBankAccountRecord {
+  id: string;
+  businessId: string;
+  peyBankAccountId: string; // ULID que devuelve Pey: el bankAccountId del QR
+  alias: string;
+  status: PeyBankAccountStatus;
+  holderName: string;
+  clabeLast4: string; // últimos 4 dígitos de la CLABE, solo para mostrar
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppointmentStore {
   getBusinessBySlug(slug: string): Promise<BusinessRecord | undefined>;
   getBusiness(id: string): Promise<BusinessRecord | undefined>;
   saveBusiness(b: BusinessRecord): Promise<void>;
+  // Cuenta de pagos Pey (CoDi): una por negocio. saveBankAccount hace
+  // upsert por businessId (re-registrar reemplaza la cuenta anterior).
+  getBankAccount(businessId: string): Promise<PeyBankAccountRecord | undefined>;
+  saveBankAccount(a: Omit<PeyBankAccountRecord, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<PeyBankAccountRecord>;
   // Auth Fase 2: crear negocio (con ownerId de la sesión) y servicios.
   createBusiness(b: Omit<BusinessRecord, "id"> & { id?: string }): Promise<BusinessRecord>;
   createService(s: Omit<ServiceRecord, "id"> & { id?: string }): Promise<ServiceRecord>;
@@ -115,6 +139,8 @@ export function createMemoryStore(): AppointmentStore {
   const appointments = new Map<string, AppointmentRecord>();
   const users = new Map<string, UserRecord>();
   const sessions = new Map<string, SessionRecord>();
+  // Cuenta de pagos Pey por negocio (1:1, clave = businessId).
+  const bankAccounts = new Map<string, PeyBankAccountRecord>();
   // Pey exige numRef numérico de hasta 7 dígitos: secuencial por cita.
   let nextNumRef = 1000000;
 
@@ -149,6 +175,19 @@ export function createMemoryStore(): AppointmentStore {
     getBusiness: async (id) => businesses.get(id),
     saveBusiness: async (b) => {
       businesses.set(b.id, b);
+    },
+    getBankAccount: async (businessId) => bankAccounts.get(businessId),
+    saveBankAccount: async (a) => {
+      const now = new Date().toISOString();
+      const existing = bankAccounts.get(a.businessId);
+      const rec: PeyBankAccountRecord = {
+        ...a,
+        id: a.id ?? existing?.id ?? crypto.randomUUID(),
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      };
+      bankAccounts.set(a.businessId, rec);
+      return rec;
     },
     createBusiness: async (b) => {
       const rec: BusinessRecord = { ...b, id: b.id ?? crypto.randomUUID() };

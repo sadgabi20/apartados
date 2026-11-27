@@ -13,6 +13,7 @@ export type {
   Appointment as PrismaAppointment,
   Business as PrismaBusiness,
   GoogleAccount as PrismaGoogleAccount,
+  PeyBankAccount as PrismaPeyBankAccount,
   Service as PrismaService,
   Session as PrismaSession,
   User as PrismaUser,

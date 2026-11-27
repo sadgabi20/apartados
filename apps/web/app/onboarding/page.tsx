@@ -2,13 +2,16 @@
 // 1) Formulario: nombre, slug (propuesto desde el nombre, editable),
 //    primer servicio (nombre, duración, anticipo) y agenda pública o
 //    privada — SIEMPRE se pregunta, sin default silencioso (decisión §10).
-// 2) Conectar Google Calendar (opcional, saltable; luego desde el dashboard).
-// 3) Comparte tu link: /b/[slug] y /negocio/[slug].
+// 2) Conectar cuenta de pagos (opcional, saltable; luego desde
+//    /negocio/[slug]): la CLABE donde caen los anticipos por CoDi.
+// 3) Conectar Google Calendar (opcional, saltable; luego desde el dashboard).
+// 4) Comparte tu link: /b/[slug] y /negocio/[slug].
 // Sin sesión, a /login. La web solo llama a apps/api, nunca a Google directo.
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import BankAccountSection from "../../components/bank-account-section";
 import { apiErrorMessage } from "../../lib/api-error";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -37,7 +40,7 @@ function OnboardingContent() {
   const calendarStatus = params.get("calendar");
   const slugParam = params.get("slug") ?? "";
 
-  const [step, setStep] = useState<"form" | "connect" | "done">("form");
+  const [step, setStep] = useState<"form" | "payments" | "connect" | "done">("form");
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
@@ -130,7 +133,7 @@ function OnboardingContent() {
       return;
     }
     setCreated(data.business);
-    setStep("connect");
+    setStep("payments");
   }
 
   const publicUrl = created ? `/b/${created.slug}` : "";
@@ -219,6 +222,22 @@ function OnboardingContent() {
             <button onClick={createBusiness} disabled={saving}>
               {saving ? "Creando…" : "Crear negocio"}
             </button>
+          </p>
+        </section>
+      )}
+
+      {step === "payments" && created && (
+        <section>
+          <h2>{created.name} creado ✓</h2>
+          <p>¿Dónde quieres recibir los anticipos?</p>
+          <BankAccountSection slug={created.slug} />
+          <p>
+            <button onClick={() => setStep("connect")}>Continuar</button>{" "}
+            <button onClick={() => setStep("connect")}>Saltar por ahora</button>
+          </p>
+          <p>
+            Si la saltas, los anticipos se cobran con la cuenta de Apartados
+            hasta que conectes la tuya desde la página del negocio.
           </p>
         </section>
       )}

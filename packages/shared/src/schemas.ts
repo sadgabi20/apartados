@@ -39,6 +39,45 @@ export const createChargeSchema = z.object({
   numRef: z.string(), // = Appointment.numRef (numérico, máx. 7 dígitos)
 });
 
+// CLABE (18 dígitos): el dígito 18 es verificador. Pesos 3-7-1 repetidos
+// sobre los primeros 17 dígitos; cada producto se toma módulo 10 y el
+// verificador es (10 - suma % 10) % 10. Pey también lo valida en su API
+// (400 INVALID_CLABE) y además exige que el banco tenga CoDi habilitado,
+// pero validar aquí evita un viaje a Pey con una CLABE mal escrita.
+// La web usa el mismo algoritmo (apps/web/components/bank-account-section.tsx):
+// la web no depende de @apartados/shared, así que va duplicado a propósito.
+export function isValidClabe(clabe: string): boolean {
+  if (!/^[0-9]{18}$/.test(clabe)) return false;
+  const weights = [3, 7, 1];
+  let sum = 0;
+  for (let i = 0; i < 17; i++) {
+    sum += (Number(clabe[i]) * weights[i % 3]) % 10;
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return check === Number(clabe[17]);
+}
+
+// Cuenta de pagos del negocio (Pey): POST /bank-account en el OpenAPI
+// oficial de Pey (CoDi API v2026-10-20, re-confirmado 2026-11-26).
+// Campos: alias, name (nombre legal del titular), clabe (18 dígitos),
+// entity (BUSINESS = persona moral, PERSON = persona física) y taxId
+// opcional (RFC: 12 caracteres moral, 13 física). La CLABE completa se
+// manda una vez a Pey y NUNCA se guarda en Apartados: solo se conserva
+// el id de Pey + los últimos 4 dígitos (ver PeyBankAccount).
+export const registerBankAccountSchema = z.object({
+  alias: z.string().min(1).max(255),
+  name: z.string().min(1).max(255),
+  clabe: z
+    .string()
+    .regex(/^[0-9]{18}$/, "la CLABE debe tener 18 dígitos")
+    .refine(isValidClabe, "CLABE inválida: revisa los 18 dígitos"),
+  entity: z.enum(["BUSINESS", "PERSON"]),
+  taxId: z
+    .string()
+    .regex(/^[A-Za-z0-9]{12,13}$/, "el RFC debe tener 12 o 13 caracteres")
+    .optional(),
+});
+
 export const peyWebhookSchema = z.object({
   type: z.string(),
   amount: z.number(),

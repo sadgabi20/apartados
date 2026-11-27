@@ -16,6 +16,9 @@ interface MeBusiness {
   name: string;
   agendaVisibility: "public" | "private";
   calendarConnected: boolean;
+  // Cuenta de pagos (CoDi): "none" = sin conectar, "pending" = en
+  // validación con Banxico, "active" = recibe directo, "error" = rechazada.
+  paymentAccountStatus: "none" | "pending" | "active" | "error";
 }
 
 interface Me {
@@ -91,6 +94,25 @@ function DashboardContent() {
               <>
                 No conectado —{" "}
                 <a href={`${API}/google/auth?slug=${active.slug}`}>Conectar Google Calendar</a>
+              </>
+            )}
+          </p>
+          <p>
+            Cuenta de pagos:{" "}
+            {active.paymentAccountStatus === "active" ? (
+              <strong>Conectada ✓</strong>
+            ) : active.paymentAccountStatus === "pending" ? (
+              <>En validación con Banxico</>
+            ) : active.paymentAccountStatus === "error" ? (
+              <>
+                No se pudo validar —{" "}
+                <a href={`/negocio/${active.slug}`}>revisar en el negocio</a>
+              </>
+            ) : (
+              <>
+                Sin conectar: los anticipos se cobran con la cuenta de
+                Apartados —{" "}
+                <a href={`/negocio/${active.slug}`}>conectar mi CLABE</a>
               </>
             )}
           </p>

@@ -36,6 +36,10 @@ const FIELD_LABELS: Record<string, string> = {
   concept: "concepto",
   expiration: "expiración",
   numRef: "referencia",
+  alias: "alias",
+  clabe: "CLABE",
+  entity: "tipo de persona",
+  taxId: "RFC",
 };
 
 // Zod habla inglés; se traducen los mensajes más comunes para que el
