@@ -449,6 +449,10 @@ export async function createPrismaStore(prisma: PrismaClient): Promise<Appointme
       });
       return list.map(toAppointmentRecord);
     },
+    listAppointmentsByBusiness: async (businessId) => {
+      const list = await prisma.appointment.findMany({ where: { businessId } });
+      return list.map(toAppointmentRecord);
+    },
     upsertUserByGoogleSub: async (u) => {
       const user = await prisma.user.upsert({
         where: { googleSub: u.googleSub },

@@ -18,6 +18,39 @@ export interface GoogleCtx {
   refreshAccessToken?: RefreshAccessToken;
 }
 
+// Una cita guardada bloquea el hueco [startAt, endAt) si está en hold
+// vigente o confirmada. released/cancelled nunca bloquean; un hold
+// vencido tampoco (lo libera release-expired, pero aunque el cron no
+// haya corrido todavía, el hueco ya no es suyo: expiresAt manda).
+// El solape es de intervalo semiabierto: una cita que termina a las
+// 11:00 no bloquea el hueco de las 11:00.
+export function appointmentBlocksSlot(
+  a: AppointmentRecord,
+  startAt: string,
+  endAt: string,
+  now: Date = new Date(),
+): boolean {
+  if (a.status !== "hold" && a.status !== "confirmed") return false;
+  if (a.status === "hold" && new Date(a.expiresAt).getTime() <= now.getTime()) return false;
+  const s = new Date(startAt).getTime();
+  const e = new Date(endAt).getTime();
+  return s < new Date(a.endAt).getTime() && e > new Date(a.startAt).getTime();
+}
+
+// ¿Alguna cita guardada del negocio solapa [startAt, endAt)?
+// Respaldo en base de datos para cuando no hay freeBusy que consultar
+// (o como segunda barrera cuando sí lo hay).
+export async function hasStoredOverlap(
+  store: AppointmentStore,
+  businessId: string,
+  startAt: string,
+  endAt: string,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const list = await store.listAppointmentsByBusiness(businessId);
+  return list.some((a) => appointmentBlocksSlot(a, startAt, endAt, now));
+}
+
 export async function createHold(input: {
   store: AppointmentStore;
   google: GoogleCtx | null;
@@ -37,6 +70,15 @@ export async function createHold(input: {
   // /availability) o con Z; se guarda siempre en el mismo formato.
   const startAt = start.toISOString();
   const endAt = end.toISOString();
+
+  // Respaldo en base de datos, con o sin Google: dos citas del mismo
+  // negocio no pueden solaparse. Sin Google no hay freeBusy que
+  // consultar; con Google, esto cubre huecos apartados sin evento
+  // (p. ej. creados mientras el calendario estaba desconectado).
+  // Mismo error que el camino de Google (la ruta responde 409).
+  if (await hasStoredOverlap(input.store, input.businessId, startAt, endAt)) {
+    throw new Error("SLOT_TAKEN");
+  }
 
   let googleEventId: string | null = null;
   if (input.google) {
