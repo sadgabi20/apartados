@@ -123,6 +123,10 @@ export interface AppointmentStore {
   getAppointmentByNumRef(numRef: string): Promise<AppointmentRecord | undefined>;
   updateAppointment(id: string, patch: Partial<AppointmentRecord>): Promise<AppointmentRecord | undefined>;
   listExpiredHolds(now: Date): Promise<AppointmentRecord[]>;
+  // Citas de un negocio (para el respaldo anti-doble-reserva sin Google:
+  // createHold y /availability revisan solapes en base de datos cuando
+  // no hay freeBusy que consultar).
+  listAppointmentsByBusiness(businessId: string): Promise<AppointmentRecord[]>;
   // Auth Fase 1: upsert por googleSub (la identidad es el sub, no el email).
   upsertUserByGoogleSub(u: Omit<UserRecord, "id" | "createdAt" | "updatedAt">): Promise<UserRecord>;
   getUserById(id: string): Promise<UserRecord | undefined>;
@@ -265,5 +269,7 @@ export function createMemoryStore(): AppointmentStore {
       [...appointments.values()].filter(
         (a) => a.status === "hold" && new Date(a.expiresAt) <= now,
       ),
+    listAppointmentsByBusiness: async (businessId) =>
+      [...appointments.values()].filter((a) => a.businessId === businessId),
   };
 }
